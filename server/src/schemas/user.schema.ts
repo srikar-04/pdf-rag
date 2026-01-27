@@ -1,14 +1,21 @@
 import * as z from "zod"
 
-export const userSchema = z.object({
-    id: z.uuid(),
-    username: z.string().trim().toLowerCase().min(3, {error: "username should be minimum 3 characters"}).max(15, {error: "username cannot excede 15 characters"}),
-    email: z.email({error: (iss) => (`invalid email id: ${iss.message}, ${iss.code}`)}),
-    provider: z.enum(["google", "github"]),
+const OAuthUserSchema = z.object({
+    provider: z.enum(["GOOGLE", "GITHUB"]),
     providerUserId: z.string(),
-    created_at: z.date().optional(),
-    updated_at: z.date().optional(),
-    deletedAt: z.date().optional()
+    email: z.email().optional(),
 })
 
-export type UserInput = z.infer<typeof userSchema>
+const UserProfileSchema = z.object({
+    username: z.string().trim().min(3, {error: "username should be minimum 3 characters"}).max(15, {error: "username cannot excede 15 characters"}),
+})
+
+const UserUpdateSchema = z.object({
+    username: z.string().trim().min(3, {error: "username should be minimum 3 characters"}).max(15, {error: "username cannot excede 15 characters"}).optional(),
+})
+
+export type OAuthUserInput = z.infer<typeof OAuthUserSchema>
+
+export type UserProfileInput = z.infer<typeof UserProfileSchema>
+
+export type UserUpdateInput = z.infer<typeof UserUpdateSchema>
