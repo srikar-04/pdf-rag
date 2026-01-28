@@ -4,7 +4,11 @@ function App() {
 
   return (
     <>
-      <div>Hello World !</div>
+      <main className='width-full h-screen bg-zinc-800 text-white'>
+        <div className='px-2 py-1'>
+          Hello World !
+        </div>
+      </main>
     </>
   )
 }
