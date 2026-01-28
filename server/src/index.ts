@@ -1,17 +1,17 @@
 import dotenv from 'dotenv'
 dotenv.config()
-import express from "express";
-import { ExpressAuth } from "@auth/express";
-import GitHub from '@auth/express/providers/github';
-import Google from '@auth/express/providers/google';
+import { prisma } from './lib/prisma.js'
+import app from './app.js'
 
-const app = express()
+const PORT = process.env.PORT || 3000
 
-app.set("trust proxy", true)
-app.use("/auth", ExpressAuth({
-    providers: [GitHub, Google]
-}))
+prisma.$connect()
+.then( () => {
+    console.log("Database connected")
 
-app.listen(3000, () => {
-    console.log('app is listening on port 3000')
+    app.listen(PORT, () => {
+        console.log('app is listening on port', PORT)
+    })
+}).catch((error) => {
+    console.log("Database connection failed", error)
 })
