@@ -22,6 +22,7 @@ function App() {
       } catch (error) {
         console.error('Failed to check session:', error)
       }
+      console.log("user", user)
     }
     checkSession()
   }, [])
@@ -38,11 +39,8 @@ const handleSignIn = () => {
 }
 
   const handleSignOut = () => {
-    const form = document.createElement('form')
-    form.method = 'POST'
-    form.action = 'http://localhost:3000/auth/signout'
-    document.body.appendChild(form)
-    form.submit()    
+    setUser(null)
+    window.location.href = "http://localhost:3000/auth/signout?callbackUrl=http://localhost:5173"   
   }
   return (
     <>

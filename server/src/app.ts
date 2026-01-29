@@ -39,6 +39,9 @@ const authConfig: any = {
             console.log(email, '\n', username, '\n', provider, '\n', providerUserId, '\n')
             return true
         },
+        async redirect({url, baseUrl}: {url: string, baseUrl: string}) {
+            return "http://localhost:5173"
+        }
     }
 }
 
