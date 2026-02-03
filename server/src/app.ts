@@ -6,11 +6,10 @@ import ApiError from "./utils/apiError.js";
 import { ExpressAuth, getSession } from "@auth/express";
 import GitHub from '@auth/express/providers/github';
 import Google from '@auth/express/providers/google';
+import type { ExpressAuthConfig } from "@auth/express";
 
-import type { AdapterUser } from "@auth/express/adapters";
-import type { User, Account, Profile } from "@auth/express";
-import type { CredentialInput } from "@auth/express/providers";
 import authMiddleware from "./middlewares/auth.middleware.js";
+import authRouter from './routes/auth.routes.js'
 
 const githubClientId = process.env.AUTH_GITHUB_ID
 const githubClientSecret = process.env.AUTH_GITHUB_SECRET
@@ -26,7 +25,7 @@ if (!googleClientId || !googleClientSecret) {
     throw new Error('AUTH_GOOGLE_ID or AUTH_GOOGLE_SECRET is not defined')
 }
 
-export const authConfig: any = {
+export const authConfig: ExpressAuthConfig = {
     providers: [
         GitHub({ clientId: githubClientId, clientSecret: githubClientSecret }),
         Google({ clientId: googleClientId, clientSecret: googleClientSecret })
@@ -35,7 +34,7 @@ export const authConfig: any = {
     trustHost: true,
     // skipCSRFCheck: true,
     callbacks: {
-        async signIn({user, account, credentials, profile, email}: {user: User | AdapterUser, account: Account, credentials: CredentialInput, profile: Profile, email: string}) {
+        async signIn({user, account, credentials, profile, email}) {
             // everything working here
             console.log(user.id, user.name, user.email, user.image)
             console.log(account?.provider, account?.providerAccountId)
@@ -59,58 +58,47 @@ app.use(cors({
 app.use(urlencoded({ extended: true }))
 
 app.set("trust proxy", true)
- app.use("/auth", ExpressAuth(
-// {
-//     providers: [
-//         GitHub({ clientId: githubClientId, clientSecret: githubClientSecret }),
-//         Google({ clientId: googleClientId, clientSecret: googleClientSecret })
-//     ],
-//     basePath: '/auth',
-//     trustHost: true,
-//     // skipCSRFCheck: true,
-//     callbacks: {
-//         // async signIn({ user, account, profile, credentials }: any) {
-//         //     // user object
-//         //     // const email = user.email
-//         //     // const provider = user.provider
-//         //     // const providerUserId = user.providerUserId
-//         //     // const username = user.username
+app.use("/auth", ExpressAuth(
+    // {
+    //     providers: [
+    //         GitHub({ clientId: githubClientId, clientSecret: githubClientSecret }),
+    //         Google({ clientId: googleClientId, clientSecret: googleClientSecret })
+    //     ],
+    //     basePath: '/auth',
+    //     trustHost: true,
+    //     // skipCSRFCheck: true,
+    //     callbacks: {
+    //         // async signIn({ user, account, profile, credentials }: any) {
+    //         //     // user object
+    //         //     // const email = user.email
+    //         //     // const provider = user.provider
+    //         //     // const providerUserId = user.providerUserId
+    //         //     // const username = user.username
 
-//         //     // account object 
-        
+    //         //     // account object 
 
-//         //     // console.log(email, '\n', username, '\n', provider, '\n', providerUserId, '\n')
-//         //     return true
-//         // },
-//         async signIn({user, account, credentials, profile, email}) {
-//             // console.log("user", user, "account", account, "credentials", credentials, "profile", profile, "email", email)
-//             console.log(user.id, user.name, user.email, user.image)
-//             console.log(account?.provider, account?.providerAccountId)
-//             return true
-//         },
-//         async redirect({url, baseUrl}: {url: string, baseUrl: string}) {
-//             return "http://localhost:5173"
-//         }
-//     }
-// }
-authConfig
+
+    //         //     // console.log(email, '\n', username, '\n', provider, '\n', providerUserId, '\n')
+    //         //     return true
+    //         // },
+    //         async signIn({user, account, credentials, profile, email}) {
+    //             // console.log("user", user, "account", account, "credentials", credentials, "profile", profile, "email", email)
+    //             console.log(user.id, user.name, user.email, user.image)
+    //             console.log(account?.provider, account?.providerAccountId)
+    //             return true
+    //         },
+    //         async redirect({url, baseUrl}: {url: string, baseUrl: string}) {
+    //             return "http://localhost:5173"
+    //         }
+    //     }
+    // }
+    authConfig
 ))
 
 
 // ROUTES
 
-app.get('/', (req: Request, res: Response, next: NextFunction) => {
-    res.send('Hello World!')
-})
-
-app.get('/api/v1/auth/session', async (req: Request, res: Response) => {
-    try {
-        const session = await getSession(req, authConfig)
-        res.json(new ApiResponse(200, session || { user: null }, 'Session retrieved'))
-    } catch (error) {
-        res.json(new ApiResponse(200, { user: null }, 'No session found'))
-    }
-})
+app.use('/api/v1/auth', authRouter)
 
 app.get('/protected-route', authMiddleware, async (req: Request, res: Response, next: NextFunction )=> {
     res.send('now you are accessing protected route')

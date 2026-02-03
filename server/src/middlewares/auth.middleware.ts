@@ -2,7 +2,6 @@ import type { Request, Response, NextFunction } from "express";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { getSession } from "@auth/express";
 import { authConfig } from "../app.js";
-import type { Session } from "@auth/express";
 import ApiError from "../utils/apiError.js";
 
 
