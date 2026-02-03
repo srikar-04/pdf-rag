@@ -10,6 +10,7 @@ import Google from '@auth/express/providers/google';
 import type { AdapterUser } from "@auth/express/adapters";
 import type { User, Account, Profile } from "@auth/express";
 import type { CredentialInput } from "@auth/express/providers";
+import authMiddleware from "./middlewares/auth.middleware.js";
 
 const githubClientId = process.env.AUTH_GITHUB_ID
 const githubClientSecret = process.env.AUTH_GITHUB_SECRET
@@ -25,7 +26,7 @@ if (!googleClientId || !googleClientSecret) {
     throw new Error('AUTH_GOOGLE_ID or AUTH_GOOGLE_SECRET is not defined')
 }
 
-const authConfig: any = {
+export const authConfig: any = {
     providers: [
         GitHub({ clientId: githubClientId, clientSecret: githubClientSecret }),
         Google({ clientId: googleClientId, clientSecret: googleClientSecret })
@@ -109,6 +110,10 @@ app.get('/api/v1/auth/session', async (req: Request, res: Response) => {
     } catch (error) {
         res.json(new ApiResponse(200, { user: null }, 'No session found'))
     }
+})
+
+app.get('/protected-route', authMiddleware, async (req: Request, res: Response, next: NextFunction )=> {
+    res.send('now you are accessing protected route')
 })
 
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
