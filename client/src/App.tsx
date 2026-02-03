@@ -17,12 +17,13 @@ function App() {
         })
         const result = await response.json()
         if (result.success && result.data.user) {
-          setUser(result.data.user)
+          console.log('complete data from backend : ', result.data.user)
+          setUser(() => result.data.user)
+          console.log('user : ', user)
         }
       } catch (error) {
         console.error('Failed to check session:', error)
       }
-      console.log("user", user)
     }
     checkSession()
   }, [])
@@ -31,11 +32,13 @@ const handleSignIn = () => {
 
   console.log('provider in frontend : ', provider)
 
-  const form = document.createElement('form')
-  form.method = 'POST'
-  form.action = `http://localhost:3000/auth/signin/${provider}`
-  document.body.appendChild(form)
-  form.submit()
+  // const form = document.createElement('form')
+  // form.method = 'POST'
+  // form.action = `http://localhost:3000/auth/signin/${provider}`
+  // document.body.appendChild(form)
+  // form.submit()
+
+  window.location.href = `http://localhost:3000/auth/signin?provider=${provider}&callbackUrl=http://localhost:5173`
 }
 
   const handleSignOut = () => {

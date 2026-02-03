@@ -7,6 +7,10 @@ import { ExpressAuth, getSession } from "@auth/express";
 import GitHub from '@auth/express/providers/github';
 import Google from '@auth/express/providers/google';
 
+import type { AdapterUser } from "@auth/express/adapters";
+import type { User, Account, Profile } from "@auth/express";
+import type { CredentialInput } from "@auth/express/providers";
+
 const githubClientId = process.env.AUTH_GITHUB_ID
 const githubClientSecret = process.env.AUTH_GITHUB_SECRET
 
@@ -28,15 +32,12 @@ const authConfig: any = {
     ],
     basePath: '/auth',
     trustHost: true,
-    skipCSRFCheck: true,
+    // skipCSRFCheck: true,
     callbacks: {
-        async signIn({ user, account, profile, credentials }: any) {
-            const email = user.email
-            const provider = user.provider
-            const providerUserId = user.providerUserId
-            const username = user.username
-
-            console.log(email, '\n', username, '\n', provider, '\n', providerUserId, '\n')
+        async signIn({user, account, credentials, profile, email}: {user: User | AdapterUser, account: Account, credentials: CredentialInput, profile: Profile, email: string}) {
+            // everything working here
+            console.log(user.id, user.name, user.email, user.image)
+            console.log(account?.provider, account?.providerAccountId)
             return true
         },
         async redirect({url, baseUrl}: {url: string, baseUrl: string}) {
@@ -57,7 +58,42 @@ app.use(cors({
 app.use(urlencoded({ extended: true }))
 
 app.set("trust proxy", true)
-app.use("/auth", ExpressAuth(authConfig))
+ app.use("/auth", ExpressAuth(
+// {
+//     providers: [
+//         GitHub({ clientId: githubClientId, clientSecret: githubClientSecret }),
+//         Google({ clientId: googleClientId, clientSecret: googleClientSecret })
+//     ],
+//     basePath: '/auth',
+//     trustHost: true,
+//     // skipCSRFCheck: true,
+//     callbacks: {
+//         // async signIn({ user, account, profile, credentials }: any) {
+//         //     // user object
+//         //     // const email = user.email
+//         //     // const provider = user.provider
+//         //     // const providerUserId = user.providerUserId
+//         //     // const username = user.username
+
+//         //     // account object 
+        
+
+//         //     // console.log(email, '\n', username, '\n', provider, '\n', providerUserId, '\n')
+//         //     return true
+//         // },
+//         async signIn({user, account, credentials, profile, email}) {
+//             // console.log("user", user, "account", account, "credentials", credentials, "profile", profile, "email", email)
+//             console.log(user.id, user.name, user.email, user.image)
+//             console.log(account?.provider, account?.providerAccountId)
+//             return true
+//         },
+//         async redirect({url, baseUrl}: {url: string, baseUrl: string}) {
+//             return "http://localhost:5173"
+//         }
+//     }
+// }
+authConfig
+))
 
 
 // ROUTES
