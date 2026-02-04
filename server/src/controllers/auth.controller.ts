@@ -5,7 +5,7 @@ import { getSession, type Session } from "@auth/express";
 import ApiResponse from "../utils/apiResponse.js";
 import ApiError from "../utils/apiError.js";
 import type { SessionUser } from "../app.js";
-import { OAuthUserSchema } from "../schemas/user.schema.js";
+import { OAuthUserSchema, UserProfileSchema } from "../schemas/user.schema.js";
 import { prisma } from "../lib/prisma.js";
 
 
@@ -13,7 +13,7 @@ const getUserSession = asyncHandler(async (req: Request, res: Response, next: Ne
     try {
         const session = await getSession(req, authConfig) as SessionUser['session']
 
-        if(!session || !session.user) {
+        if (!session || !session.user) {
             throw new ApiError(401, 'Unauthorized')
         }
 
@@ -30,7 +30,7 @@ const getUserSession = asyncHandler(async (req: Request, res: Response, next: Ne
         // 2) validate "userAuth" details with zod schema
         const parsedAuthUser = OAuthUserSchema.safeParse(rawUser)
 
-        if(!parsedAuthUser.success) {
+        if (!parsedAuthUser.success) {
             throw new ApiError(401, 'OAuth user failed validation')
         }
 
@@ -44,11 +44,11 @@ const getUserSession = asyncHandler(async (req: Request, res: Response, next: Ne
             }
         })
 
-        if(existingUser) {
-            return res.json(new ApiResponse(200, session.user && {onBoardingRequired: false}, "session retrieved, onboarding not required"))
+        if (existingUser) {
+            return res.json(new ApiResponse(200, session.user && { onBoardingRequired: false }, "session retrieved, onboarding not required"))
         }
 
-        return res.json(new ApiResponse(200, session.user && {onBoardingRequired: true}, "session retrieved, onboarding required"))
+        return res.json(new ApiResponse(200, session.user && { onBoardingRequired: true }, "session retrieved, onboarding required"))
 
         // 4) upserting user is done in another route and in below controller
 
@@ -59,7 +59,58 @@ const getUserSession = asyncHandler(async (req: Request, res: Response, next: Ne
 })
 
 const registerUser = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-    
+
+    const session = await getSession(req, authConfig) as SessionUser['session']
+
+    if (!session || !session.user) {
+        throw new ApiError(401, 'Unauthorized')
+    }
+
+    const username = req.body.username
+
+    // 1) validate username with zod schema
+    const parsedUsername = UserProfileSchema.safeParse(username)
+
+    if (!parsedUsername.success) {
+        throw new ApiError(400, 'Invalid username')
+    }
+
+    // 2) check if username is already taken
+    const existingUser = await prisma.user.findUnique({
+        where: {
+            username: parsedUsername.data.username
+        }
+    })
+
+    if (existingUser) {
+        throw new ApiError(409, 'username already taken')
+    }
+
+    // 3) Validate OAuth details from session (to get correct Provider enum type)
+    const rawAuth = {
+        provider: session.provider,
+        providerUserId: session.providerUserId,
+        email: session.user.email
+    }
+
+    const parsedAuthUser = OAuthUserSchema.safeParse(rawAuth)
+
+    if (!parsedAuthUser.success) {
+        throw new ApiError(401, 'Unauthorized, provider details invalid in session')
+    }
+
+    const { provider, providerUserId } = parsedAuthUser.data
+
+    const user = await prisma.user.create({
+        data: {
+            username: parsedUsername.data.username,
+            email: session.user.email!,
+            provider: provider,
+            providerUserId: providerUserId
+        }
+    })
+
+    return res.status(201).json(new ApiResponse(201, { user }, 'User registered successfully'))
 })
 
 export { getUserSession, registerUser }

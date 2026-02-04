@@ -1,7 +1,7 @@
 import * as z from "zod"
 
 export const OAuthUserSchema = z.object({
-    provider: z.enum(["GOOGLE", "GITHUB"]).transform((val) => val.toUpperCase() as "GOOGLE" | "GITHUB"),
+    provider: z.enum(["google", "github", "GOOGLE", "GITHUB"]).transform((val) => val.toUpperCase() as "GOOGLE" | "GITHUB"),
     providerUserId: z.string(),
     email: z.email().optional(),
 })
