@@ -3,10 +3,29 @@ import cors from 'cors'
 import ApiResponse from "./utils/apiResponse.js";
 import ApiError from "./utils/apiError.js";
 
-import { ExpressAuth, getSession } from "@auth/express";
+import { ExpressAuth } from "@auth/express";
 import GitHub from '@auth/express/providers/github';
 import Google from '@auth/express/providers/google';
 import type { ExpressAuthConfig } from "@auth/express";
+import type { Session } from "@auth/express";
+import type { JWT } from '@auth/core/jwt'
+import type { AdapterUser } from "@auth/express/adapters";
+import type { AdapterSession } from "@auth/express/adapters";
+
+export type SessionUser = {
+    session: {
+        user: AdapterUser;
+    } &
+    AdapterSession &
+    Session & {
+        provider?: string;
+        providerUserId?: string;
+    },
+    token: JWT & {
+        provider?: string;
+        providerUserId?: string;
+    }
+}
 
 import authMiddleware from "./middlewares/auth.middleware.js";
 import authRouter from './routes/auth.routes.js'
@@ -34,14 +53,29 @@ export const authConfig: ExpressAuthConfig = {
     trustHost: true,
     // skipCSRFCheck: true,
     callbacks: {
-        async signIn({user, account, credentials, profile, email}) {
+        async signIn({ user, account, credentials, profile, email }) {
             // everything working here
             console.log(user.id, user.name, user.email, user.image)
-            console.log(account?.provider, account?.providerAccountId)
+            console.log(account?.provider, account?.providerAccountId, '\n \n \n')
             return true
         },
-        async redirect({url, baseUrl}: {url: string, baseUrl: string}) {
+        async redirect({ url, baseUrl }: { url: string, baseUrl: string }) {
             return "http://localhost:5173"
+        },
+        async jwt({token, user, account}) {
+            if(user) {
+                token.provider = account?.provider
+                token.providerUserId = account?.providerAccountId
+            }
+            return token
+        },
+        async session({session, token}: SessionUser) {
+            if(token && token.provider && token.providerUserId) {
+                session.provider = token.provider
+                session.providerUserId = token.providerUserId
+            }
+            console.log("session from backend : ", session)
+            return session
         }
     }
 }
@@ -58,42 +92,7 @@ app.use(cors({
 app.use(urlencoded({ extended: true }))
 
 app.set("trust proxy", true)
-app.use("/auth", ExpressAuth(
-    // {
-    //     providers: [
-    //         GitHub({ clientId: githubClientId, clientSecret: githubClientSecret }),
-    //         Google({ clientId: googleClientId, clientSecret: googleClientSecret })
-    //     ],
-    //     basePath: '/auth',
-    //     trustHost: true,
-    //     // skipCSRFCheck: true,
-    //     callbacks: {
-    //         // async signIn({ user, account, profile, credentials }: any) {
-    //         //     // user object
-    //         //     // const email = user.email
-    //         //     // const provider = user.provider
-    //         //     // const providerUserId = user.providerUserId
-    //         //     // const username = user.username
-
-    //         //     // account object 
-
-
-    //         //     // console.log(email, '\n', username, '\n', provider, '\n', providerUserId, '\n')
-    //         //     return true
-    //         // },
-    //         async signIn({user, account, credentials, profile, email}) {
-    //             // console.log("user", user, "account", account, "credentials", credentials, "profile", profile, "email", email)
-    //             console.log(user.id, user.name, user.email, user.image)
-    //             console.log(account?.provider, account?.providerAccountId)
-    //             return true
-    //         },
-    //         async redirect({url, baseUrl}: {url: string, baseUrl: string}) {
-    //             return "http://localhost:5173"
-    //         }
-    //     }
-    // }
-    authConfig
-))
+app.use("/auth", ExpressAuth(authConfig))
 
 
 // ROUTES
