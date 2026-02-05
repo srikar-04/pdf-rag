@@ -48,7 +48,7 @@ export const authConfig: ExpressAuthConfig = {
                 session.provider = token.provider as string
                 session.providerUserId = token.providerUserId as string
             }
-            console.log("session from backend : ", session)
+            // console.log("session from backend : ", session)
             return session
         }
     }

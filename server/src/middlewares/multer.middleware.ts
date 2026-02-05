@@ -20,7 +20,7 @@ const storage = multer.diskStorage({
             -> userId_timestamp_random_originalName.format <-
         */
 
-        const userId = req.user?.id
+        const userEmail = req.user?.email
         const timestamp = Date.now();
         const random = crypto.randomBytes(6).toString("hex");
 
@@ -29,7 +29,7 @@ const storage = multer.diskStorage({
         .basename(file.originalname, ext)
         .replace(/\s+/g, "_");
 
-        const filename = `${userId}_${timestamp}_${random}_${baseName}${ext}`; 
+        const filename = `${userEmail}_${timestamp}_${random}_${baseName}${ext}`; 
             
         cb(null, filename)
     }

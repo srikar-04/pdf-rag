@@ -7,7 +7,7 @@ import fs from 'fs'
 
 export const documentUpload = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     
-    console.log('control reached document upload controller')
+    console.log('\n \n control reached document upload controller \n \n ')
 
     const file = req.file
 
@@ -21,15 +21,20 @@ export const documentUpload = asyncHandler(async (req: Request, res: Response, n
     console.log('file hash: ', fileHash)
 
     // change file name with hash and user id
-    const userId  = req.user?.id
-    if(!userId) {
-        throw new ApiError(401, "Unauthorized, userId not found")
+    const userEmail  = req.user?.email
+    if(!userEmail) {
+        console.log('\n \n req.user: ', req.user)
+        throw new ApiError(401, "Unauthorized, userEmail not found")
     }
-    const filename = `${userId}_${fileHash}_${file.originalname}`
-    console.log('filename: ', filename)
+    const filename = `${userEmail}_${fileHash}_${file.originalname}`
+    console.log('\n filename: \n \n ', filename)
 
     // upload to imagekit.io
-    console.log('UPLOADING TO IMAGEKIT.IO, WILL REACH OUT TO YOU IN SOME TIME :))')
+    console.log('\n \n UPLOADING TO IMAGEKIT.IO, WILL REACH OUT TO YOU IN SOME TIME :)) \n \n ')
+
+    res.json({
+        message: "file uploaded successfully"
+    })
     // create entry in db
     // return response
 
