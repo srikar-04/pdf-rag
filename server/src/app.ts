@@ -10,6 +10,7 @@ import type { ExpressAuthConfig } from "@auth/express";
 
 import authMiddleware from "./middlewares/auth.middleware.js";
 import authRouter from './routes/auth.routes.js'
+import documentRouter from './routes/document.routes.js'
 
 const githubClientId = process.env.AUTH_GITHUB_ID
 const githubClientSecret = process.env.AUTH_GITHUB_SECRET
@@ -84,6 +85,7 @@ app.use("/auth", ExpressAuth(authConfig))
 // ROUTES
 
 app.use('/api/v1/auth', authRouter)
+app.use('/api/v1/document', documentRouter)
 
 app.get('/protected-route', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
     res.send('now you are accessing protected route')

@@ -17,7 +17,7 @@ function App() {
         })
         const result = await response.json()
         if (result.success && result.data.user) {
-          console.log('complete data from backend : ', result.data.user)
+          console.log('complete data from backend : ', result)
           setUser(() => result.data.user)
           console.log('user : ', user)
         }
