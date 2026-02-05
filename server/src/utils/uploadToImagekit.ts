@@ -1,8 +1,9 @@
 import ImageKit from "@imagekit/nodejs"
 import ApiError from "./apiError.js"
 import fs from 'fs'
+import { prisma } from "../lib/prisma.js"
 
-export const uploadToImagekit = async (file: Express.Multer.File) => {
+export const uploadToImagekit = async (file: Express.Multer.File, fileHash: string) => {
 
     const imageKitPrivateKey = process.env.IMAGEKIT_PRIVATE_KEY
 
@@ -19,6 +20,24 @@ export const uploadToImagekit = async (file: Express.Multer.File) => {
     if(!file) {
         console.log(file)
         throw new ApiError(413, 'file not uploaded, in imagekit upload handler')
+    }
+
+    // check if the file is already present in database
+    const fileExists = await prisma.document.findUnique({
+        where: {
+            documentHash: fileHash
+        }
+    })
+
+    if(fileExists) {
+        // deleting file from local path
+        // returning the db response
+
+        fs.unlink(file.path, (err) => {
+            if(err) console.log('error deleting local file, in imagekit upload handler : ', err)
+            else console.log('local file deleted successfully from imagekit upload handler')
+        })
+        return fileExists
     }
 
     const fileName = file?.filename
