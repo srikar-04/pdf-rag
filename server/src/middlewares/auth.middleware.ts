@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { getSession } from "@auth/express";
-import { authConfig } from "../app.js";
+import { authConfig } from "../config/auth.config.js";
 import ApiError from "../utils/apiError.js";
 
 const authMiddleware = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {

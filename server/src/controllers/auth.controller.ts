@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import { asyncHandler } from "../utils/asyncHandler.js";
-import { authConfig } from "../app.js";
+import { authConfig } from "../config/auth.config.js";
 import { getSession, type Session } from "@auth/express";
 import ApiResponse from "../utils/apiResponse.js";
 import ApiError from "../utils/apiError.js";
@@ -58,18 +58,20 @@ const getUserSession = asyncHandler(async (req: Request, res: Response, next: Ne
 })
 
 const registerUser = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-
+    console.log('authConfig in registerUser: ', authConfig ? 'Defined' : 'Undefined')
     const session = await getSession(req, authConfig)
     if (!session || !session.user) {
+        console.log('In registerUser Controller, session not found : ', session)
         throw new ApiError(401, 'Unauthorized')
     }
 
     const username = req.body.username
 
     // 1) validate username with zod schema
-    const parsedUsername = UserProfileSchema.safeParse(username)
+    const parsedUsername = UserProfileSchema.safeParse({username})
 
     if (!parsedUsername.success) {
+        console.log(parsedUsername.error)
         throw new ApiError(400, 'Invalid username')
     }
 
