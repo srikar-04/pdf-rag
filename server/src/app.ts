@@ -7,25 +7,6 @@ import { ExpressAuth } from "@auth/express";
 import GitHub from '@auth/express/providers/github';
 import Google from '@auth/express/providers/google';
 import type { ExpressAuthConfig } from "@auth/express";
-import type { Session } from "@auth/express";
-import type { JWT } from '@auth/core/jwt'
-import type { AdapterUser } from "@auth/express/adapters";
-import type { AdapterSession } from "@auth/express/adapters";
-
-export type SessionUser = {
-    session: {
-        user: AdapterUser;
-    } &
-    AdapterSession &
-    Session & {
-        provider?: string;
-        providerUserId?: string;
-    },
-    token: JWT & {
-        provider?: string;
-        providerUserId?: string;
-    }
-}
 
 import authMiddleware from "./middlewares/auth.middleware.js";
 import authRouter from './routes/auth.routes.js'
@@ -62,15 +43,20 @@ export const authConfig: ExpressAuthConfig = {
         async redirect({ url, baseUrl }: { url: string, baseUrl: string }) {
             return "http://localhost:5173"
         },
-        async jwt({token, user, account}) {
-            if(user) {
-                token.provider = account?.provider
-                token.providerUserId = account?.providerAccountId
+        async jwt({ token, user, account }) {
+            if (user) {
+                if(account?.provider && account.providerAccountId) {
+                    token.provider = account?.provider
+                    token.providerUserId = account?.providerAccountId
+                } else {
+                    console.error('provider details not found')
+                    throw new ApiError(404, 'provider details not found in callback')
+                }
             }
             return token
         },
-        async session({session, token}: SessionUser) {
-            if(token && token.provider && token.providerUserId) {
+        async session({ session, token }) {
+            if (token && token.provider && token.providerUserId) {
                 session.provider = token.provider
                 session.providerUserId = token.providerUserId
             }
@@ -99,7 +85,7 @@ app.use("/auth", ExpressAuth(authConfig))
 
 app.use('/api/v1/auth', authRouter)
 
-app.get('/protected-route', authMiddleware, async (req: Request, res: Response, next: NextFunction )=> {
+app.get('/protected-route', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
     res.send('now you are accessing protected route')
 })
 

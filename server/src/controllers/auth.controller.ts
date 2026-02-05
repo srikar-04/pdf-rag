@@ -4,14 +4,13 @@ import { authConfig } from "../app.js";
 import { getSession, type Session } from "@auth/express";
 import ApiResponse from "../utils/apiResponse.js";
 import ApiError from "../utils/apiError.js";
-import type { SessionUser } from "../app.js";
 import { OAuthUserSchema, UserProfileSchema } from "../schemas/user.schema.js";
 import { prisma } from "../lib/prisma.js";
 
 
 const getUserSession = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const session = await getSession(req, authConfig) as SessionUser['session']
+        const session = await getSession(req, authConfig)
 
         if (!session || !session.user) {
             throw new ApiError(401, 'Unauthorized')
@@ -45,10 +44,10 @@ const getUserSession = asyncHandler(async (req: Request, res: Response, next: Ne
         })
 
         if (existingUser) {
-            return res.json(new ApiResponse(200, session.user && { onBoardingRequired: false }, "session retrieved, onboarding not required"))
+            return res.json(new ApiResponse(200, { user: existingUser, onBoardingRequired: false }, "session retrieved, onboarding not required"))
         }
 
-        return res.json(new ApiResponse(200, session.user && { onBoardingRequired: true }, "session retrieved, onboarding required"))
+        return res.json(new ApiResponse(200, { user: session.user, onBoardingRequired: true }, "session retrieved, onboarding required"))
 
         // 4) upserting user is done in another route and in below controller
 
@@ -60,8 +59,7 @@ const getUserSession = asyncHandler(async (req: Request, res: Response, next: Ne
 
 const registerUser = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
 
-    const session = await getSession(req, authConfig) as SessionUser['session']
-
+    const session = await getSession(req, authConfig)
     if (!session || !session.user) {
         throw new ApiError(401, 'Unauthorized')
     }

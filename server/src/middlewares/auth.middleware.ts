@@ -4,7 +4,6 @@ import { getSession } from "@auth/express";
 import { authConfig } from "../app.js";
 import ApiError from "../utils/apiError.js";
 
-
 const authMiddleware = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     // getting session
     // checking if there is user in session
@@ -16,6 +15,7 @@ const authMiddleware = asyncHandler(async (req: Request, res: Response, next: Ne
 
         if (session && session.user) {
             // user and session exists. pass to next middleware
+            req.user = session.user
             next()
         } else {
             // user or session does not exist
