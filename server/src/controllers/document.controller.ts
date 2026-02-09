@@ -50,7 +50,7 @@ export const documentUpload = asyncHandler(async (req: Request, res: Response, n
     }
 
     // generate hash for the file and log it
-    const fileBuffer = fs.readFileSync(file.path)
+    const fileBuffer = await fs.promises.readFile(file.path)
     const fileHash = crypto.createHash('sha256').update(fileBuffer).digest('hex')
     console.log('file hash: ', fileHash)
 
@@ -69,10 +69,7 @@ export const documentUpload = asyncHandler(async (req: Request, res: Response, n
     if("fileId" in imageKitResponse) {
         // response is defenitely from imagekit cause fileId is only present in the imagekit response
 
-        fs.unlink(file.path, (err) => {
-            if(err) console.log('error deleting local file : ', err)
-            else console.log('Local file deleted successfully')
-        })
+        deleteLocalFile(file)
     } else {
         console.log('response is the already existed document: ', imageKitResponse)
 
@@ -114,6 +111,7 @@ export const documentUpload = asyncHandler(async (req: Request, res: Response, n
 
     if(!imageKitResponse.url) {
         console.log('imagekit response : ', imageKitResponse)
+        deleteLocalFile(file)
         throw new ApiError(500, 'imagekit response url not found')
     }
     
