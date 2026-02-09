@@ -9,9 +9,11 @@ import ApiResponse from "../utils/apiResponse.js";
 const createChat = asyncHandler( async (req: Request, res: Response, next:NextFunction) => {
     console.log('chat controller reached')
 
-    const chatName = req.body.chatName
+    const { chatName } = req.body
 
-    const parsedChatName = ChatCreateSchema.safeParse(chatName)
+    const parsedChatName = ChatCreateSchema.safeParse({
+        title: chatName
+    })
 
     if(!parsedChatName.success) {
         const errorMessages = parsedChatName.error.issues.map(issue => issue.message)
@@ -24,7 +26,7 @@ const createChat = asyncHandler( async (req: Request, res: Response, next:NextFu
 
     // create db entry for chat creation
 
-    const createChatDb = prisma.chat.create({
+    const createChatDb = await prisma.chat.create({
         data: {
             title: chatName,
             userId: req.user.id
