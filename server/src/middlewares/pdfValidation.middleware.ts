@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from "express";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { DocumentUploadSchema } from "../schemas/document.schema.js";
 import ApiError from "../utils/apiError.js";
+import { deleteLocalFile } from "../utils/uploadToImagekit.js";
 
 
 export const validatePdfUpload = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
@@ -21,6 +22,7 @@ export const validatePdfUpload = asyncHandler(async (req: Request, res: Response
 
     if (!parsedFileDetails.success) {
         const errorMessages = parsedFileDetails.error.issues.map(issue => issue.message)
+        deleteLocalFile(file)
         throw new ApiError(413, 'File validation failed', errorMessages)
     }
 

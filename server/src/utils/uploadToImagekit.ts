@@ -3,6 +3,13 @@ import ApiError from "./apiError.js"
 import fs from 'fs'
 import { prisma } from "../lib/prisma.js"
 
+export const deleteLocalFile = (file: Express.Multer.File) => {
+    fs.unlink(file.path, (err) => {
+        if(err) console.log('error deleting local file, in imagekit upload handler : ', err)
+        else console.log('local file deleted successfully from imagekit upload handler')
+    })
+}
+
 export const uploadToImagekit = async (file: Express.Multer.File, fileHash: string) => {
 
     const imageKitPrivateKey = process.env.IMAGEKIT_PRIVATE_KEY
@@ -33,10 +40,7 @@ export const uploadToImagekit = async (file: Express.Multer.File, fileHash: stri
         // deleting file from local path
         // returning the db response
 
-        fs.unlink(file.path, (err) => {
-            if(err) console.log('error deleting local file, in imagekit upload handler : ', err)
-            else console.log('local file deleted successfully from imagekit upload handler')
-        })
+        deleteLocalFile(file)
         return fileExists
     }
 

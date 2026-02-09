@@ -4,7 +4,7 @@ import ApiError from "../utils/apiError.js";
 import crypto from 'crypto'
 import fs from 'fs'
 import ImageKit from "@imagekit/nodejs";
-import { uploadToImagekit } from "../utils/uploadToImagekit.js";
+import { deleteLocalFile, uploadToImagekit } from "../utils/uploadToImagekit.js";
 import type { Document } from "../generated/prisma/client.js";
 import ApiResponse from "../utils/apiResponse.js";
 import { prisma } from "../lib/prisma.js";
@@ -16,12 +16,18 @@ export const documentUpload = asyncHandler(async (req: Request, res: Response, n
     const file = req.file
     const chatId = req.params.chatId
 
+    if(!file) {
+        throw new ApiError(400, "No file uploaded")
+    }
+
     if(!userId) {
         console.log('\n \n req.user: ', req.user)
+        deleteLocalFile(file)
         throw new ApiError(401, "Unauthorized, userId not found")
     }
 
     if(!chatId) {
+        deleteLocalFile(file)
         throw new ApiError(400, "No chat id provided")
     }
 
@@ -32,17 +38,15 @@ export const documentUpload = asyncHandler(async (req: Request, res: Response, n
     })
 
     if(!chat) {
+        deleteLocalFile(file)
         throw new ApiError(404, "chat not found")
     }
 
     const chatUserId = chat.userId
 
     if(chatUserId !== userId) {
+        deleteLocalFile(file)
         throw new ApiError(401, "Unauthorized, user id does not match")
-    }
-
-    if(!file) {
-        throw new ApiError(400, "No file uploaded")
     }
 
     // generate hash for the file and log it
