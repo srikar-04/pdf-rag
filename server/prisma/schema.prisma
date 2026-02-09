@@ -19,6 +19,11 @@ enum DocStatus {
   failed
 }
 
+enum ChatStatus {
+  empty
+  active
+}
+
 enum Role {
   user
   assistant
@@ -45,6 +50,7 @@ model Chat {
   userId String
   user   User   @relation(fields: [userId], references: [id])
   title  String
+  chatStatus ChatStatus @default(empty)
   documents         ChatDocument[]
   messages Message[]
   createdAt DateTime @default(now())
