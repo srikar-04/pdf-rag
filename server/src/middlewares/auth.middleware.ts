@@ -3,6 +3,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { getSession } from "@auth/express";
 import { authConfig } from "../config/auth.config.js";
 import ApiError from "../utils/apiError.js";
+import { prisma } from "../lib/prisma.js";
 
 const authMiddleware = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     // getting session
@@ -14,8 +15,25 @@ const authMiddleware = asyncHandler(async (req: Request, res: Response, next: Ne
         const session = await getSession(req, authConfig)
 
         if (session && session.user) {
-            // user and session exists. pass to next middleware
-            req.user = session.user
+            // getting user from db
+            // appending user to req.user
+
+            if(!session.user.email) {
+                throw new ApiError(400, 'user email not found in auth middleware')
+            }
+
+            const dbUser = await prisma.user.findUnique({
+                where: {
+                    email: session.user.email
+                }
+            })
+
+            if(!dbUser) {
+                throw new ApiError(404, 'user not found in auth middleware')
+            }
+
+            req.user = dbUser
+
             next()
         } else {
             // user or session does not exist

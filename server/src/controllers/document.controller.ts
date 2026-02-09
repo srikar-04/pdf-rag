@@ -26,12 +26,12 @@ export const documentUpload = asyncHandler(async (req: Request, res: Response, n
     console.log('file hash: ', fileHash)
 
     // change file name with hash and user id
-    const userEmail  = req.user?.email
-    if(!userEmail) {
+    const userId  = req.user?.id
+    if(!userId) {
         console.log('\n \n req.user: ', req.user)
-        throw new ApiError(401, "Unauthorized, userEmail not found")
+        throw new ApiError(401, "Unauthorized, userId not found")
     }
-    const filename = `${userEmail}_${fileHash}_${file.originalname}`
+    const filename = `${userId}_${fileHash}_${file.originalname}`
     console.log('\n filename: \n \n ', filename)
 
     // upload to imagekit.io
@@ -56,22 +56,6 @@ export const documentUpload = asyncHandler(async (req: Request, res: Response, n
 
 // create a new db entry
 
-    // finding the id of the user
-    if(!req.user?.email) {
-        console.log("\n \n req.user in upload document controller: ", req.user)
-        throw new ApiError(401, 'user email not found in upload document controller')
-    }
-
-    const existingUser = await prisma.user.findUnique({
-        where: {
-            email: req.user.email
-        }
-    })
-
-    if(!existingUser) {
-        console.log('user not found in document upload controller')
-        throw new ApiError(401, 'user not found in upload document controller')
-    }
 
     if(!imageKitResponse.url) {
         console.log('imagekit response : ', imageKitResponse)
@@ -84,7 +68,7 @@ export const documentUpload = asyncHandler(async (req: Request, res: Response, n
             documentHash: fileHash,
             documentStatus: "processing",
             storagePath: imageKitResponse.url,
-            userId: existingUser.id
+            userId: userId
         }
     })
 

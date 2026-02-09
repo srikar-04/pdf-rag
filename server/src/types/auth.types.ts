@@ -1,4 +1,4 @@
-import type { Session } from "@auth/express";
+import type { User } from "../generated/prisma/client.js";
 
 declare module "@auth/express" {
     interface Session {
@@ -16,7 +16,7 @@ declare module "@auth/core/jwt" {
 declare global {
     namespace Express {
         interface Request {
-            user?: Session['user']
+            user?: User
         }
     }
 }
