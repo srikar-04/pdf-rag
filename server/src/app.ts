@@ -9,6 +9,7 @@ import { authConfig } from "./config/auth.config.js";
 import authMiddleware from "./middlewares/auth.middleware.js";
 import authRouter from './routes/auth.routes.js'
 import documentRouter from './routes/document.routes.js'
+import chatRouter from './routes/chat.routes.js'
 
 // Auth configuration moved to src/config/auth.config.ts
 
@@ -31,6 +32,7 @@ app.use("/auth", ExpressAuth(authConfig))
 
 app.use('/api/v1/auth', authRouter)
 app.use('/api/v1/document', documentRouter)
+app.use('/api/v1/chat', chatRouter)
 
 app.get('/protected-route', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
     res.send('now you are accessing protected route')

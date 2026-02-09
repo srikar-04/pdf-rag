@@ -1,10 +1,10 @@
 import * as z from 'zod'
 
-const ChatCreateSchema = z.object({
+export const ChatCreateSchema = z.object({
     title: z.string().trim().min(3, {error: 'title should be atleast 3 characters'}).max(50, {error: 'title cannot excede 50 characters'})
 })
 
-const ChatUpdateSchema = z.object({
+export const ChatUpdateSchema = z.object({
     title: z.string().trim().min(3, {error: 'title should be atleast 3 characters'}).max(50, {error: 'title cannot excede 50 characters'}).optional()
 })
 
