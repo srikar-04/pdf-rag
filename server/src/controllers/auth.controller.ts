@@ -30,7 +30,8 @@ const getUserSession = asyncHandler(async (req: Request, res: Response, next: Ne
         const parsedAuthUser = OAuthUserSchema.safeParse(rawUser)
 
         if (!parsedAuthUser.success) {
-            throw new ApiError(401, 'OAuth user failed validation')
+            const errorMessages = parsedAuthUser.error.issues.map(issue => issue.message)
+            throw new ApiError(401, 'OAuth user failed validation', errorMessages)
         }
 
         // 3) chekck if the user is already present in database
@@ -72,7 +73,8 @@ const registerUser = asyncHandler(async (req: Request, res: Response, next: Next
 
     if (!parsedUsername.success) {
         console.log(parsedUsername.error)
-        throw new ApiError(400, 'Invalid username')
+        const errorMessages = parsedUsername.error.issues.map(issue => issue.message)
+        throw new ApiError(400, 'Invalid username', errorMessages)
     }
 
     // 2) check if username is already taken
@@ -96,7 +98,8 @@ const registerUser = asyncHandler(async (req: Request, res: Response, next: Next
     const parsedAuthUser = OAuthUserSchema.safeParse(rawAuth)
 
     if (!parsedAuthUser.success) {
-        throw new ApiError(401, 'Unauthorized, provider details invalid in session')
+        const errorMessages = parsedAuthUser.error.issues.map(issue => issue.message)
+        throw new ApiError(401, 'Unauthorized, provider details invalid in session', errorMessages)
     }
 
     const { provider, providerUserId } = parsedAuthUser.data
