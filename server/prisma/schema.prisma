@@ -13,9 +13,11 @@ enum Provider {
 }
 
 enum DocStatus {
-  uploading
   processing
-  indexing
+  ready
+  failed_embedding
+  failed_chunking
+  failed_upserting
   failed
 }
 

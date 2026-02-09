@@ -9,4 +9,8 @@ router.route('/create-chat').post(
     createChat
 )
 
+// get chat information (for specific chatId)
+// chat updation (updating name)
+// chat deletion (with no cascade document deletion)
+
 export default router

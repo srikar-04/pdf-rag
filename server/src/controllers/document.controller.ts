@@ -159,3 +159,13 @@ export const documentUpload = asyncHandler(async (req: Request, res: Response, n
     res.json(new ApiResponse(200, {imageKitResponse, documentEntry}, 'file uploaded successfully'))
 
 })
+
+
+export const ingestDocument = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    // getting document id from params
+    // getting document details from db, fetch path (imagekit url)
+    // load document from cloud (we may use langchain tools)
+    // chunk document. if no chunks -> document does not contain text (delete document)
+    // embedding + upserting
+    // updating the chunkHash table
+})
