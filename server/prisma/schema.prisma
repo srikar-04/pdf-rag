@@ -14,11 +14,18 @@ enum Provider {
 
 enum DocStatus {
   processing
+  Ingesting
   ready
-  failed_embedding
-  failed_chunking
-  failed_upserting
   failed
+}
+
+enum IngestionStep {
+  none
+  fetched
+  normalized
+  chunked
+  embedded
+  upserted
 }
 
 enum ChatStatus {
@@ -31,6 +38,12 @@ enum Role {
   assistant
   system
   dev
+}
+
+enum EmbeddingStatus {
+  none
+  ready
+  failed
 }
 
 model User {
@@ -67,6 +80,7 @@ model Document {
   userId          String
   user            User    @relation(fields: [userId], references: [id])
   documentStatus  DocStatus
+  ingestionStep   IngestionStep @default(none)
   chunks          ChunkHash[]
   documentHash    String   @unique
 
@@ -98,5 +112,7 @@ model ChunkHash {
   chunkIndex    Int
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+  contentLenght Int
+  embeddingStatus EmbeddingStatus @default(none)
   @@unique([documentId, chunkHash])
 }
