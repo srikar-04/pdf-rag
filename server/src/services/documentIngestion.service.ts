@@ -3,7 +3,10 @@ import { pdfLoader } from "../integrations/pdfLoader.js";
 import type { Document } from "../generated/prisma/client.js";
 import IngestionError from "../utils/ingestionError.js";
 import { IngestionStep } from "../generated/prisma/client.js";
-import type { TextResult } from "pdf-parse";
+import type { InfoResult, TextResult } from "pdf-parse";
+import { chunking } from "../integrations/chunking.js";
+import { normalize } from "node:path";
+import { normalizeText } from "../integrations/normalize.js";
 
 const documentIngestionService = async (docDetails: Document) => {
 
@@ -14,10 +17,10 @@ const documentIngestionService = async (docDetails: Document) => {
             data: { documentStatus: "Ingesting" }
         })
 
-        // 1. Fetch doc details and extract text
+        // 1. pdf loading
         const pdfLoaderResponse = await pdfLoader(docDetails)
 
-        if(!(pdfLoaderResponse.data as TextResult).text && (pdfLoaderResponse.data as TextResult).text.length === 0) {
+        if(!(pdfLoaderResponse.data.result as TextResult).text && (pdfLoaderResponse.data.result as TextResult).text.length === 0) {
             throw new IngestionError(IngestionStep.none, 'cannot get loaded pdf text')
         }
 
@@ -26,7 +29,32 @@ const documentIngestionService = async (docDetails: Document) => {
             data: { ingestionStep: pdfLoaderResponse.ingestionStep }
         })
 
-        // ... normalize, chunk, embed, upsert ...
+        // adding metadata for doc
+        const metadata = pdfLoaderResponse.data.metadata as InfoResult
+
+        const metadataDB = await prisma.documentMetadata.create({
+            data: {
+                pages: metadata.total,
+                title: metadata.info?.Title,
+                author: metadata.info?.Author,
+                creator: metadata.info?.Creator,
+                producer: metadata.info?.Producer,
+                documentId: docDetails.id
+            }
+        })
+
+        if(!metadataDB) console.warn('metadata not added for document with id : ', docDetails.id)
+
+
+        // 2) normalizing text
+
+        const normalizedText = normalizeText(pdfLoaderResponse.data.result as TextResult)
+
+        // 3) chunking
+        const chunkingResponse = await chunking(normalizedText)
+
+
+        //  embed, upsert ...
 
         // Final update to ready
         await prisma.document.update({

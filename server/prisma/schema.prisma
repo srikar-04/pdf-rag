@@ -47,43 +47,57 @@ enum EmbeddingStatus {
 }
 
 model User {
-  id             String   @id @default(uuid())
-  username       String   @unique
-  email          String   @unique
-  provider       Provider 
-  providerUserId String   
-  created_at     DateTime @default(now())
-  updated_at     DateTime @updatedAt
+  id             String     @id @default(uuid())
+  username       String     @unique
+  email          String     @unique
+  provider       Provider
+  providerUserId String
+  created_at     DateTime   @default(now())
+  updated_at     DateTime   @updatedAt
   chats          Chat[]
   docs           Document[]
   deletedAt      DateTime?
+
   @@unique([provider, providerUserId])
 }
 
 model Chat {
-  id     String @id @default(uuid())
-  userId String
-  user   User   @relation(fields: [userId], references: [id])
-  title  String
-  chatStatus ChatStatus @default(empty)
-  documents         ChatDocument[]
-  messages Message[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String         @id @default(uuid())
+  userId     String
+  user       User           @relation(fields: [userId], references: [id])
+  title      String
+  chatStatus ChatStatus     @default(empty)
+  documents  ChatDocument[]
+  messages   Message[]
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
 }
 
 model Document {
-  id              String  @id @default(uuid())
-  documentName    String
+  id             String         @id @default(uuid())
+  documentName   String
   storagePath    String
-  chats         ChatDocument[]
-  userId          String
-  user            User    @relation(fields: [userId], references: [id])
-  documentStatus  DocStatus
-  ingestionStep   IngestionStep @default(none)
-  chunks          ChunkHash[]
-  documentHash    String   @unique
+  chats          ChatDocument[]
+  userId         String
+  user           User           @relation(fields: [userId], references: [id])
+  documentStatus DocStatus
+  ingestionStep  IngestionStep  @default(none)
+  chunks         ChunkHash[]
+  documentHash   String         @unique
+  documentMetadata DocumentMetadata?
+}
 
+model DocumentMetadata {
+  id         String   @id @default(uuid())
+  documentId String   @unique
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  pages      Int
+  title      String?
+  author     String?
+  creator    String?
+  producer   String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
 
 model ChatDocument {
@@ -96,23 +110,24 @@ model ChatDocument {
 }
 
 model Message {
-  id          String @id @default(uuid())
-  chatId      String
-  chat        Chat @relation(fields: [chatId], references: [id])
-  content     String
-  role        Role
-  createdAt   DateTime @default(now())
+  id        String   @id @default(uuid())
+  chatId    String
+  chat      Chat     @relation(fields: [chatId], references: [id])
+  content   String
+  role      Role
+  createdAt DateTime @default(now())
 }
 
 model ChunkHash {
-  id            String @id @default(uuid())
-  documentId    String 
-  doc           Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  chunkHash     String 
-  chunkIndex    Int
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  contentLenght Int
+  id              String          @id @default(uuid())
+  documentId      String
+  doc             Document        @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  chunkHash       String
+  chunkIndex      Int
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  contentLenght   Int
   embeddingStatus EmbeddingStatus @default(none)
+
   @@unique([documentId, chunkHash])
 }
