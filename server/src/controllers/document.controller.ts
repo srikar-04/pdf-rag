@@ -8,6 +8,7 @@ import { deleteLocalFile, uploadToImagekit } from "../utils/uploadToImagekit.js"
 import type { Document } from "../generated/prisma/client.js";
 import ApiResponse from "../utils/apiResponse.js";
 import { prisma } from "../lib/prisma.js";
+import { documentIngestionService } from "../services/documentIngestion.service.js";
 
 
 export const documentUpload = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
@@ -162,10 +163,64 @@ export const documentUpload = asyncHandler(async (req: Request, res: Response, n
 
 
 export const ingestDocument = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-    // getting document id from params
-    // getting document details from db, fetch path (imagekit url)
-    // load document from cloud (we may use langchain tools)
-    // chunk document. if no chunks -> document does not contain text (delete document)
-    // embedding + upserting
-    // updating the chunkHash table
+
+
+    // validate document here and move the control to document ingestion service
+    // -> userId is equl to session userid or not
+    // -> is atleast linked to one chatId or not
+    
+
+    // do not wait for the service to complete, just return the response
+    // ingestion service can take a hell lot of time
+
+    const {documentId} = req.params
+
+    if(!documentId) {
+        throw new ApiError(400, 'cannot get documentId in ingestDocument controller')
+    }
+
+    const userId = req.user?.id
+
+    if(!userId) {
+        throw new ApiError(401, 'Unauthorized, userId not found in ingestDocument controller')
+    }
+
+    // check if the document is present or not
+
+    const existingDoc = await prisma.document.findUnique({
+        where: {
+            id: documentId as string
+        },
+        include: {
+            _count: {
+                select: {
+                    chats: true,
+                    chunks: true
+                }
+            }
+        }
+    })
+
+    if(!existingDoc) {
+        throw new ApiError(404, 'cannot find document with particular doc id')
+    }
+
+    if(existingDoc.userId !== userId) {
+        throw new ApiError(401, 'cannot fetch doc for this user')
+    }
+
+    if(existingDoc._count.chats === 0) {
+        throw new ApiError(400, 'document is not linked to any chat')
+    }
+
+    if(existingDoc._count.chunks !== 0 && existingDoc.documentStatus === "ready") {
+        return res.json(new ApiResponse(201, existingDoc, 'document is already ingested'))
+    }
+
+    // call document ingestion service
+
+    documentIngestionService(documentId as string)
+
+    return res.json(new ApiResponse(200, null, 'started document ingestion in background'))
+
 })
