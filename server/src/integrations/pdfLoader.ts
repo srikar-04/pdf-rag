@@ -45,6 +45,7 @@ export const pdfLoader = async (docDetails: Document) => {
     })
 
     const result = await pdfParser.getText();
+    const metadata = await pdfParser.getInfo({parsePageInfo: true})
 
     if (!result.text || result.text.trim().length === 0) {
         throw new IngestionError(IngestionStep.none, 'failed to load pdf')
@@ -56,6 +57,6 @@ export const pdfLoader = async (docDetails: Document) => {
         else console.log('local file deleted successfully from pdfLoader integration')
     })
 
-    return new IngestionResponse("fetched", result, 'loaded pdf file and fetched text response')
+    return new IngestionResponse("fetched", {result, metadata}, 'loaded pdf file and fetched text response')
 
 }
