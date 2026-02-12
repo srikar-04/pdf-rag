@@ -219,7 +219,7 @@ export const ingestDocument = asyncHandler(async (req: Request, res: Response, n
 
     // call document ingestion service
 
-    documentIngestionService(documentId as string)
+    documentIngestionService(existingDoc)
 
     return res.json(new ApiResponse(200, null, 'started document ingestion in background'))
 
