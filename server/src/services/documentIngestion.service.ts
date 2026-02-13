@@ -4,8 +4,7 @@ import type { Document } from "../generated/prisma/client.js";
 import IngestionError from "../utils/ingestionError.js";
 import { IngestionStep } from "../generated/prisma/client.js";
 import type { InfoResult, TextResult } from "pdf-parse";
-import { chunking } from "../integrations/chunking.js";
-import { normalize } from "node:path";
+import { chunking, type ChunkInfoType } from "../integrations/chunking.js";
 import { normalizeText } from "../integrations/normalize.js";
 
 const documentIngestionService = async (docDetails: Document) => {
@@ -50,8 +49,55 @@ const documentIngestionService = async (docDetails: Document) => {
 
         const normalizedText = normalizeText(pdfLoaderResponse.data.result as TextResult)
 
+        if(!normalizedText || normalizedText.length === 0) {
+            throw new IngestionError(IngestionStep.fetched, 'cannot normalize text')
+        }
+
+        await prisma.document.update({
+            where: {
+                id: docDetails.id
+            },
+            data: {
+                ingestionStep: "normalized"
+            }
+        })
+
         // 3) chunking
-        const chunkingResponse = await chunking(normalizedText)
+        const chunkingResponse  = await chunking({
+            normalizedText,
+            chunkSize: 800,
+            chunkOverlap: 150
+        })
+
+        const {rawChunks, chunkInfo}: {
+            rawChunks: string[],
+            chunkInfo: Array<ChunkInfoType>
+        } = chunkingResponse.data
+
+        if(!chunkInfo || chunkInfo.length === 0) {
+            throw new IngestionError(IngestionStep.normalized, 'failed to fetch chunk result')
+        }
+
+        // updating chunkHash table
+        await prisma.chunkHash.createMany({
+            data: chunkInfo.map( (chunk) => ({
+                documentId: docDetails.id,
+                chunkHash: chunk.chunkHash,
+                chunkIndex: chunk.chunkIndex,
+                contentLenght: chunk.contentLength,
+                embeddingStatus: chunk.embeddingStatus
+            })),
+            skipDuplicates: true
+        })
+
+        // updating docstatus in document table
+
+        await prisma.document.update({
+            where: {id: docDetails.id},
+            data: {
+                ingestionStep: chunkingResponse.ingestionStep
+            }
+        })
 
 
         //  embed, upsert ...
