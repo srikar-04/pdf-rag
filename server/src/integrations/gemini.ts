@@ -13,6 +13,15 @@ export const geminiClient = new OpenAI({
     baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/"
 })
 
+export const geminiEmbeddingClient = async (text: string | string[]) => {
+    const response = await geminiClient.embeddings.create({
+        model: "gemini-embedding-001",
+        input: text
+    })
+
+    return response.data
+}
+
 
 
 // getting list of available models

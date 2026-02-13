@@ -6,6 +6,7 @@ import { IngestionStep } from "../generated/prisma/client.js";
 import type { InfoResult, TextResult } from "pdf-parse";
 import { chunking, type ChunkInfoType } from "../integrations/chunking.js";
 import { normalizeText } from "../integrations/normalize.js";
+import { embedding } from "../integrations/embedding.js";
 
 const documentIngestionService = async (docDetails: Document) => {
 
@@ -100,7 +101,34 @@ const documentIngestionService = async (docDetails: Document) => {
         })
 
 
-        //  embed, upsert ...
+        // 4) embedding
+
+        const embeddingResponse = await embedding(rawChunks)
+
+        if(!embeddingResponse || !embeddingResponse.data) {
+            throw new IngestionError(IngestionStep.chunked, 'failed to embed document')
+        }
+
+        const embeddingsAndIndex: {
+            index: number;
+            embedding: number[];
+        }[] = embeddingResponse.data
+
+        // updating chunkHash table
+
+        await prisma.chunkHash.updateMany({
+            where: {
+                documentId: docDetails.id,
+                chunkIndex: {
+                    in: embeddingsAndIndex.map(item => item.index)
+                }
+            },
+            data: {
+                embeddingStatus: "ready"
+            }
+        })
+
+        // 5) upserting to qdrant
 
         // Final update to ready
         await prisma.document.update({
