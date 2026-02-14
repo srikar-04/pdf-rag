@@ -1,6 +1,6 @@
 import { IngestionStep } from "../generated/prisma/enums.js"
 import IngestionResponse from "../utils/ingestionResponse.js"
-import { geminiEmbeddingClient } from "./gemini.js"
+import { geminiEmbeddingClient } from "../lib/gemini.js"
 
 
 export const embedding = async (rawChunks: string[]) => {
