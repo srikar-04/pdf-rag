@@ -7,6 +7,7 @@ import type { InfoResult, TextResult } from "pdf-parse";
 import { chunking, type ChunkInfoType } from "../integrations/chunking.js";
 import { normalizeText } from "../integrations/normalize.js";
 import { embedding } from "../integrations/embedding.js";
+import { upserting } from "../integrations/upserting.js";
 
 const documentIngestionService = async (docDetails: Document) => {
 
@@ -29,7 +30,7 @@ const documentIngestionService = async (docDetails: Document) => {
             data: { ingestionStep: pdfLoaderResponse.ingestionStep }
         })
 
-        // adding metadata for doc
+        // adding metadata for doc -> will get to this in upserting layer
         const metadata = pdfLoaderResponse.data.metadata as InfoResult
 
         const metadataDB = await prisma.documentMetadata.create({
@@ -130,12 +131,13 @@ const documentIngestionService = async (docDetails: Document) => {
 
         // 5) upserting to qdrant
 
-        // Final update to ready
+        const upsertingResponse = await upserting({embeddingsAndIndex, rawChunks, chunkInfo, docDetails})
+
         await prisma.document.update({
-            where: { id: docDetails.id },
+            where: {id: docDetails.id},
             data: {
-                documentStatus: "ready",
-                ingestionStep: IngestionStep.upserted
+                ingestionStep: upsertingResponse.ingestionStep,
+                documentStatus: "ready"
             }
         })
 
