@@ -2,7 +2,7 @@ import { Router } from "express";
 import authMiddleware from "../middlewares/auth.middleware.js";
 import { upload } from "../middlewares/multer.middleware.js";
 import { validatePdfUpload } from "../middlewares/pdfValidation.middleware.js";
-import { documentUpload, ingestDocument } from "../controllers/document.controller.js";
+import { documentUpload, ingestDocument, documentStatus } from "../controllers/document.controller.js";
 
 const router = Router()
 
@@ -24,6 +24,12 @@ router
     router.route('/ingest/:documentId').post(
         authMiddleware,
         ingestDocument
+    )
+
+    // polling for doc status
+
+    router.route('/status/:documentId').get(
+        documentStatus
     )
 
     // deleting document

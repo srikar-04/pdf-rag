@@ -224,3 +224,38 @@ export const ingestDocument = asyncHandler(async (req: Request, res: Response, n
     return res.json(new ApiResponse(200, null, 'started document ingestion in background'))
 
 })
+
+export const documentStatus = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    const documentId = req.params.documentId
+
+    if(!documentId) throw new ApiError(404, 'document id not found in document status controller')
+
+    // get document details from db
+
+    const docDB = await prisma.document.findUnique({
+        where: {
+            id: documentId as string
+        },
+        select: {
+            documentStatus: true,
+            ingestionStep: true,
+            id: true,
+            userId: true,
+
+        }
+    })
+
+
+    if(!docDB) {
+        throw new ApiError(404, 'doc not found in db from doc status handler')
+    }
+
+    const user = req.user
+
+    if(!user || (docDB.userId !== user.id)) {
+        throw new ApiError(401, 'un authenticated user from doc status handler')
+    }
+
+    res.json(new ApiResponse(201, docDB, 'successfully fetched doc status details'))
+
+})
