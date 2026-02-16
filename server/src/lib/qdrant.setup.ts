@@ -7,18 +7,18 @@ const COLLECTION_NAME = "pdf-rag-system";
 const VECTOR_DIMENSION = 768;
 
 export async function ensureQdrantCollection() {
-  const exists = await qdrantClient.collectionExists(COLLECTION_NAME);
+  const exists = await qdrantClient.collectionExists(COLLECTION_NAME)
 
-  if (!exists) {
+  if (!exists.exists) {
     console.log("Creating Qdrant collection...");
 
     await qdrantClient.createCollection(COLLECTION_NAME, {
       vectors: {
         size: VECTOR_DIMENSION,
         distance: "Cosine",
-        on_disk: true,
-      },
-    });
+        on_disk: true
+      }
+    })
 
     console.log("Qdrant collection created.");
   } else {
