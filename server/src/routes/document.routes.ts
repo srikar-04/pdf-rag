@@ -29,6 +29,7 @@ router
     // polling for doc status
 
     router.route('/status/:documentId').get(
+        authMiddleware,
         documentStatus
     )
 

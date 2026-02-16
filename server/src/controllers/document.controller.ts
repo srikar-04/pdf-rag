@@ -252,8 +252,12 @@ export const documentStatus = asyncHandler(async (req: Request, res: Response, n
 
     const user = req.user
 
-    if(!user || (docDB.userId !== user.id)) {
+    if(!user) {
         throw new ApiError(401, 'un authenticated user from doc status handler')
+    }
+
+    if(user.id !== docDB.userId) {
+        throw new ApiError(404, 'user id does not match in doc status handler')
     }
 
     res.json(new ApiResponse(201, docDB, 'successfully fetched doc status details'))
