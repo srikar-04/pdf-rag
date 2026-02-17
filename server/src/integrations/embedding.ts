@@ -53,7 +53,7 @@ export const embedding = async (rawChunks: string[]) => {
             axios.post("http://localhost:11434/api/embeddings", {
                 model: "nomic-embed-text",
                 prompt: chunk,
-            })
+            }, {timeout: 40000}),
         );
 
         const responses = await Promise.all(promises);
