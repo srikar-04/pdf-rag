@@ -12,6 +12,9 @@ import { upserting } from "../integrations/upserting.js";
 const documentIngestionService = async (docDetails: Document) => {
 
     try {
+
+        
+
         // Set status to Ingesting when starting
         await prisma.document.update({
             where: { id: docDetails.id },
@@ -51,9 +54,11 @@ const documentIngestionService = async (docDetails: Document) => {
 
         // 2) normalizing text
 
-        const normalizedText = normalizeText(pdfLoaderResponse.data.result as TextResult)
+        const normalizedTextResponse = normalizeText(pdfLoaderResponse.data.result as TextResult)
 
-        if(!normalizedText || normalizedText.length === 0) {
+        const normalizedText = normalizedTextResponse.data
+
+        if(!normalizedTextResponse || normalizedText.length === 0) {
             throw new IngestionError(IngestionStep.fetched, 'cannot normalize text')
         }
 
