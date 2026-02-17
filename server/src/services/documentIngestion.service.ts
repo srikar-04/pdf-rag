@@ -13,7 +13,7 @@ const documentIngestionService = async (docDetails: Document) => {
 
     try {
 
-        
+
 
         // Set status to Ingesting when starting
         await prisma.document.update({
@@ -24,7 +24,7 @@ const documentIngestionService = async (docDetails: Document) => {
         // 1. pdf loading
         const pdfLoaderResponse = await pdfLoader(docDetails)
 
-        if(!(pdfLoaderResponse.data.result as TextResult).text && (pdfLoaderResponse.data.result as TextResult).text.length === 0) {
+        if (!(pdfLoaderResponse.data.result as TextResult).text && (pdfLoaderResponse.data.result as TextResult).text.length === 0) {
             throw new IngestionError(IngestionStep.none, 'cannot get loaded pdf text')
         }
 
@@ -38,19 +38,26 @@ const documentIngestionService = async (docDetails: Document) => {
         // adding metadata for doc -> will get to this in upserting layer
         const metadata = pdfLoaderResponse.data.metadata as InfoResult
 
-        const metadataDB = await prisma.documentMetadata.create({
-            data: {
-                pages: metadata.total,
-                title: metadata.info?.Title,
-                author: metadata.info?.Author,
-                creator: metadata.info?.Creator,
-                producer: metadata.info?.Producer,
+        const metadataCheck = await prisma.documentMetadata.findUnique({
+            where: {
                 documentId: docDetails.id
             }
         })
 
-        if(!metadataDB) console.warn('metadata not added for document with id : ', docDetails.id)
-
+        if (metadataCheck && metadataCheck.documentId) {
+            console.log(`✅ metadata already exisits, skipping operation`)
+        } else {
+            const metadataDB = await prisma.documentMetadata.create({
+                data: {
+                    pages: metadata.total,
+                    title: metadata.info?.Title,
+                    author: metadata.info?.Author,
+                    creator: metadata.info?.Creator,
+                    producer: metadata.info?.Producer,
+                    documentId: docDetails.id
+                }
+            })
+        }
 
         // 2) normalizing text
 
@@ -58,7 +65,7 @@ const documentIngestionService = async (docDetails: Document) => {
 
         const normalizedText = normalizedTextResponse.data
 
-        if(!normalizedTextResponse || normalizedText.length === 0) {
+        if (!normalizedTextResponse || normalizedText.length === 0) {
             throw new IngestionError(IngestionStep.fetched, 'cannot normalize text')
         }
 
@@ -69,23 +76,23 @@ const documentIngestionService = async (docDetails: Document) => {
                 id: docDetails.id
             },
             data: {
-                ingestionStep: "normalized"
+                ingestionStep: normalizedTextResponse.ingestionStep
             }
         })
 
         // 3) chunking
-        const chunkingResponse  = await chunking({
+        const chunkingResponse = await chunking({
             normalizedText,
             chunkSize: 800,
             chunkOverlap: 150
         })
 
-        const {rawChunks, chunkInfo}: {
+        const { rawChunks, chunkInfo }: {
             rawChunks: string[],
             chunkInfo: Array<ChunkInfoType>
         } = chunkingResponse.data
 
-        if(!chunkInfo || chunkInfo.length === 0) {
+        if (!chunkInfo || chunkInfo.length === 0) {
             throw new IngestionError(IngestionStep.normalized, 'failed to fetch chunk result')
         }
 
@@ -93,7 +100,7 @@ const documentIngestionService = async (docDetails: Document) => {
 
         // updating chunkHash table
         await prisma.chunkHash.createMany({
-            data: chunkInfo.map( (chunk) => ({
+            data: chunkInfo.map((chunk) => ({
                 documentId: docDetails.id,
                 chunkHash: chunk.chunkHash,
                 chunkIndex: chunk.chunkIndex,
@@ -106,7 +113,7 @@ const documentIngestionService = async (docDetails: Document) => {
         // updating docstatus in document table
 
         await prisma.document.update({
-            where: {id: docDetails.id},
+            where: { id: docDetails.id },
             data: {
                 ingestionStep: chunkingResponse.ingestionStep
             }
@@ -117,7 +124,7 @@ const documentIngestionService = async (docDetails: Document) => {
 
         const embeddingResponse = await embedding(rawChunks)
 
-        if(!embeddingResponse || !embeddingResponse.data) {
+        if (!embeddingResponse || !embeddingResponse.data) {
             throw new IngestionError(IngestionStep.chunked, 'failed to embed document')
         }
 
@@ -154,12 +161,12 @@ const documentIngestionService = async (docDetails: Document) => {
 
         // 5) upserting to qdrant
 
-        const upsertingResponse = await upserting({embeddingsAndIndex, rawChunks, chunkInfo, docDetails})
+        const upsertingResponse = await upserting({ embeddingsAndIndex, rawChunks, chunkInfo, docDetails })
 
         console.log(`\n ✅ upserted into qdrant \n `)
 
         await prisma.document.update({
-            where: {id: docDetails.id},
+            where: { id: docDetails.id },
             data: {
                 ingestionStep: upsertingResponse.ingestionStep,
                 documentStatus: "ready"
@@ -170,7 +177,7 @@ const documentIngestionService = async (docDetails: Document) => {
         console.error('error in ingestion pipeline : ', error)
 
         if (error instanceof IngestionError) {
-            
+
             await prisma.document.update({
                 where: { id: docDetails.id },
                 data: {

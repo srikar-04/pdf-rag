@@ -47,28 +47,57 @@ export const embedding = async (rawChunks: string[]) => {
 
     // embedding using ollama
 
+    // try {
+
+    //     const promises = rawChunks.map(chunk =>
+    //         axios.post("http://localhost:11434/api/embeddings", {
+    //             model: "nomic-embed-text",
+    //             prompt: chunk,
+    //         }, {timeout: 50000}),
+    //     );
+
+    //     const responses = await Promise.all(promises);
+
+    //     const embeddingAndIndex = responses.map((res, index) => ({
+    //         index,
+    //         embedding: res.data.embedding,
+    //     }));
+
+    //     return new IngestionResponse(IngestionStep.embedded, embeddingAndIndex, 'sucessfully done with embedding')
+
+    // } catch (error) {
+
+    //     console.log('error while embedding : ', error)
+    //     throw new IngestionError(IngestionStep.chunked, 'failed to embed chunks')
+
+    // }
+
+
+
     try {
+        const embeddingAndIndex: {
+            index: number,
+            embedding: number[]
+        }[] = []
 
-        const promises = rawChunks.map(chunk =>
-            axios.post("http://localhost:11434/api/embeddings", {
+        for (let i = 0; i < rawChunks.length; i++) {
+            const response = await axios.post("http://localhost:11434/api/embeddings", {
                 model: "nomic-embed-text",
-                prompt: chunk,
-            }, {timeout: 40000}),
-        );
+                prompt: rawChunks[i],
+            }, { timeout: 60000 });
 
-        const responses = await Promise.all(promises);
+            embeddingAndIndex.push({
+                index: i,
+                embedding: response.data.embedding
+            });
 
-        const embeddingAndIndex = responses.map((res, index) => ({
-            index,
-            embedding: res.data.embedding,
-        }));
+            console.log(`✅ Embedded chunk ${i + 1}/${rawChunks.length}`);
+        }
 
-        return new IngestionResponse(IngestionStep.embedded, embeddingAndIndex, 'sucessfully done with embedding')
-        
+        return new IngestionResponse(IngestionStep.embedded, embeddingAndIndex, 'successfully done with sequential embedding');
+
     } catch (error) {
-        
-        console.log('error while embedding : ', error)
-        throw new IngestionError(IngestionStep.chunked, 'failed to embed chunks')
-
+        console.log('error while sequential embedding : ', error);
+        throw new IngestionError(IngestionStep.chunked, 'failed to embed chunks sequentially');
     }
 }
