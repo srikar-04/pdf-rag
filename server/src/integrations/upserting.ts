@@ -9,7 +9,7 @@ import type { ChunkInfoType } from './chunking.js'
 import IngestionResponse from '../utils/ingestionResponse.js'
 
 const NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8'
-const COLLECTION_NAME = "pdf-rag-system";
+export const COLLECTION_NAME = "pdf-rag-system";
 
 type UpsertParams = {
   embeddingsAndIndex: {
