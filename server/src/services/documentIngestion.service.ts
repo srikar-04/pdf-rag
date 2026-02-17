@@ -25,6 +25,8 @@ const documentIngestionService = async (docDetails: Document) => {
             throw new IngestionError(IngestionStep.none, 'cannot get loaded pdf text')
         }
 
+        console.log(`\n ✅ loaded pdf \n `)
+
         await prisma.document.update({
             where: { id: docDetails.id },
             data: { ingestionStep: pdfLoaderResponse.ingestionStep }
@@ -55,6 +57,8 @@ const documentIngestionService = async (docDetails: Document) => {
             throw new IngestionError(IngestionStep.fetched, 'cannot normalize text')
         }
 
+        console.log(`\n ✅ normalized text \n `)
+
         await prisma.document.update({
             where: {
                 id: docDetails.id
@@ -79,6 +83,8 @@ const documentIngestionService = async (docDetails: Document) => {
         if(!chunkInfo || chunkInfo.length === 0) {
             throw new IngestionError(IngestionStep.normalized, 'failed to fetch chunk result')
         }
+
+        console.log(`\n ✅ chunked normalized text \n `)
 
         // updating chunkHash table
         await prisma.chunkHash.createMany({
@@ -115,6 +121,18 @@ const documentIngestionService = async (docDetails: Document) => {
             embedding: number[];
         }[] = embeddingResponse.data
 
+        console.log(`\n ✅ embedded chunks \n `)
+
+        // updating doc status
+        await prisma.document.update({
+            where: {
+                id: docDetails.id
+            },
+            data: {
+                ingestionStep: embeddingResponse.ingestionStep
+            }
+        })
+
         // updating chunkHash table
 
         await prisma.chunkHash.updateMany({
@@ -133,6 +151,8 @@ const documentIngestionService = async (docDetails: Document) => {
 
         const upsertingResponse = await upserting({embeddingsAndIndex, rawChunks, chunkInfo, docDetails})
 
+        console.log(`\n ✅ upserted into qdrant \n `)
+
         await prisma.document.update({
             where: {id: docDetails.id},
             data: {
@@ -144,21 +164,16 @@ const documentIngestionService = async (docDetails: Document) => {
     } catch (error) {
         console.error('error in ingestion pipeline : ', error)
 
-        let failedStep: IngestionStep = IngestionStep.none;
-        let errorMessage = "Ingestion failed";
-
         if (error instanceof IngestionError) {
-            failedStep = error.ingestionStep;
-            errorMessage = error.message;
+            
+            await prisma.document.update({
+                where: { id: docDetails.id },
+                data: {
+                    documentStatus: "failed",
+                    ingestionStep: error.ingestionStep
+                }
+            })
         }
-
-        await prisma.document.update({
-            where: { id: docDetails.id },
-            data: {
-                documentStatus: "failed",
-                ingestionStep: failedStep
-            }
-        })
     }
 
 }

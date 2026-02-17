@@ -38,7 +38,7 @@ export const upserting = async ({embeddingsAndIndex, rawChunks, chunkInfo, docDe
         
         const text = rawChunks[embedding.index]
         
-        if(!chunkHash || !chunkIndex || !text) {
+        if(!chunkHash || chunkIndex === undefined || !text) {
             throw new IngestionError(IngestionStep.embedded, 'cannot find payload in upserting file')
         }
 
