@@ -2,18 +2,18 @@ import { qdrantClient } from "../lib/qdrant.client.js"
 import { COLLECTION_NAME } from "../integrations/upserting.js"
 
 type RetrievalType = {
-    queryEmbeddings: number[],
+    embeddings: number[],
     userId: string,
     documentId: string
 }
 
-type RetrievalResponse = {
+export type RetrievalResponse = {
     context: string,
     chunks: string[],
     found: boolean
 }
 
-export const queryRetrieval = async ({ queryEmbeddings, userId, documentId }: RetrievalType): Promise<RetrievalResponse> => {
+export const queryRetrieval = async ({ embeddings, userId, documentId }: RetrievalType): Promise<RetrievalResponse> => {
 
 
     // search qdrant points using query
@@ -21,7 +21,7 @@ export const queryRetrieval = async ({ queryEmbeddings, userId, documentId }: Re
     // get top k elements (for now k = 5)
 
     const response = await qdrantClient.query(COLLECTION_NAME, {
-        query: queryEmbeddings,
+        query: embeddings,
         filter: {
             must: [
                 {

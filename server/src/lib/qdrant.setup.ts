@@ -9,6 +9,16 @@ const VECTOR_DIMENSION = 768;
 export async function ensureQdrantCollection() {
   const exists = await qdrantClient.collectionExists(COLLECTION_NAME)
 
+  await qdrantClient.createPayloadIndex(COLLECTION_NAME, {
+    field_name: "userId",
+    field_schema: "keyword"
+  });
+
+  await qdrantClient.createPayloadIndex(COLLECTION_NAME, {
+    field_name: "documentId",
+    field_schema: "keyword"
+  });
+
   if (!exists.exists) {
     console.log("Creating Qdrant collection...");
 
