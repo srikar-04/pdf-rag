@@ -38,9 +38,9 @@ export const queryRetrieval = async ({ embeddings, userId, documentId }: Retriev
                 }
             ]
         },
-        limit: 5,
+        limit: 8,
         with_payload: true,
-        score_threshold: 0.4
+        // score_threshold: 0.4
     })
 
     if (response.points.length === 0) {

@@ -3,7 +3,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import ApiError from "../utils/apiError.js";
 import { prisma } from "../lib/prisma.js";
 import axios from "axios";
-import { queryRetrieval, type RetrievalResponse } from "../utils/retrieval.js";
+import { queryRetrieval, type RetrievalResponse } from "../helpers/retrieval.js";
 import { geminiClient } from "../lib/gemini.js";
 import type { ChatCompletionMessageParam } from "openai/resources/index.mjs";
 import ApiResponse from "../utils/apiResponse.js";
@@ -45,7 +45,7 @@ export const query = asyncHandler(async (req: Request, res: Response, next: Next
         }
     })
 
-    if(chatDB?.userId !== user.id) {
+    if (chatDB?.userId !== user.id) {
         throw new ApiError(401, "chat user id did not match, un authenticated user")
     }
 
@@ -96,24 +96,28 @@ export const query = asyncHandler(async (req: Request, res: Response, next: Next
     }));
 
     const formattedHistory = chatHistory
-    .map(msg => `${msg.role.toUpperCase}: ${msg.content}`)
-    .join('\n')
+        .map(msg => `${msg.role.toUpperCase}: ${msg.content}`)
+        .join('\n')
 
     console.log(`☑️ fetched ${chatHistory.length} previous messages for context \n`);
 
     const systemPrompt = `
     
-    You are an intelligent ai assistnat specialized in answering user questions soley based on the "availble context", "previous chat history" and "user-query"
+    You are an intelligent ai assistnat specialized in answering user questions by reasoning on available context and relevant chat history
+    
+    using the provided document context and relevant chat histroy, answer user's questions in clear, detailed and well structured manner
 
-    the context for the question and chat history are delemented in triple qoutes below
+    Rules:
+    - Provide a complete explanation.
+    - Connect related ideas across different parts of the context.
+    - If the context allows, expand on implications or relationships.
+    - Do not answer questions which are not related to document's context or chat history. This is very important
+    
 
-    """context: ${retrievalResponse.context}"""
-    """chat-history""": ${formattedHistory}
-    """user-query""": ${query}
-
-    strictly answer the question based on the available context and chat-history.
-    If any question is out of context then just reply with "no context avilable for this topic" or whatever similar sentence you choose.
-
+    IMPORTANT :
+    Always explain the reasoning clearly.
+    Structure your answer in paragraphs.
+    If information is missing, explicitly state that the document does not provide it.
     `
 
     let messages: any = [
@@ -130,7 +134,10 @@ export const query = asyncHandler(async (req: Request, res: Response, next: Next
 
     const response = await geminiClient.chat.completions.create({
         model: "models/gemini-2.5-flash",
-        messages
+        messages,
+        reasoning_effort: "medium",
+        temperature: 0.4,
+        max_completion_tokens: 800
     })
 
     if (!response) throw new ApiError(400, 'failed to get llm response')
