@@ -1,6 +1,7 @@
 import { Router } from "express";
 import authMiddleware from "../middlewares/auth.middleware.js";
 import { upload } from "../middlewares/multer.middleware.js";
+import { uploadLimiter } from "../middlewares/rateLimit.middleware.js";
 import { validatePdfUpload } from "../middlewares/pdfValidation.middleware.js";
 import { documentUpload, ingestDocument, documentStatus } from "../controllers/document.controller.js";
 
@@ -10,6 +11,7 @@ router
     .route('/upload/:chatId')
     .post(
         authMiddleware,
+        uploadLimiter, // Rate limit: 5 uploads per hour
         // multer middleware
         upload.single('file'),
         // zod validation

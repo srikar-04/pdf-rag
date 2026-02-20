@@ -122,7 +122,7 @@ const documentIngestionService = async (docDetails: Document) => {
 
         // 4) embedding
 
-        const embeddingResponse = await embedding(rawChunks)
+        const embeddingResponse = await embedding(rawChunks, docDetails.id)
 
         if (!embeddingResponse || !embeddingResponse.data) {
             throw new IngestionError(IngestionStep.chunked, 'failed to embed document')
@@ -131,7 +131,7 @@ const documentIngestionService = async (docDetails: Document) => {
         const embeddingsAndIndex: {
             index: number;
             embedding: number[];
-        }[] = embeddingResponse.data
+        }[] = embeddingResponse.data.embeddings
 
         console.log(`\n ✅ embedded chunks \n `)
 

@@ -5,6 +5,7 @@ import { prisma } from "../lib/prisma.js";
 import axios from "axios";
 import { queryRetrieval, type RetrievalResponse } from "../helpers/retrieval.js";
 import { geminiClient } from "../lib/gemini.js";
+import { env } from "../config/env.schema.js";
 import type { ChatCompletionMessageParam } from "openai/resources/index.mjs";
 import ApiResponse from "../utils/apiResponse.js";
 import type { Role } from "../generated/prisma/enums.js";
@@ -64,15 +65,25 @@ export const query = asyncHandler(async (req: Request, res: Response, next: Next
 
     console.log(`☑️ updated db with user query \n`)
 
-    // 2) embbed query using ollama
-    const queryEmbeddings = await axios.post("http://localhost:11434/api/embeddings", {
-        model: "nomic-embed-text",
-        prompt: query,
-    }, { timeout: 60000 })
+    // 2) embed query AND fetch chat history in parallel (independent operations)
+    const [queryEmbeddings, lastMessages] = await Promise.all([
+        // Embed query using Ollama
+        axios.post(`${env.OLLAMA_BASE_URL}/api/embeddings`, {
+            model: env.EMBEDDING_MODEL,
+            prompt: query,
+        }, { timeout: 30000 }),
+        
+        // Fetch chat history (already in chronological order)
+        prisma.message.findMany({
+            where: { chatId: chatId as string },
+            orderBy: { createdAt: "asc" }, // Fetch in chronological order directly
+            take: 8
+        }),
+    ]);
 
-    if (!queryEmbeddings.data) throw new ApiError(400, 'unable to embbed use query')
+    if (!queryEmbeddings.data) throw new ApiError(400, 'unable to embed user query')
 
-    console.log(`☑️ embedded user query \n`)
+    console.log(`☑️ embedded user query and fetched chat history (parallel)\n`)
 
     let userId = user.id
     let embeddings = queryEmbeddings.data.embedding as number[]
@@ -82,21 +93,14 @@ export const query = asyncHandler(async (req: Request, res: Response, next: Next
 
     console.log(`☑️ retrieved context for user query \n`)
 
-    // 4) get chat history for last 8 messages
-    const lastMessages = await prisma.message.findMany({
-        where: { chatId: chatId as string },
-        orderBy: { createdAt: "desc" },
-        take: 8
-    });
-
-    // Format them for the LLM (Reverse to get chronological order)
-    const chatHistory = lastMessages.reverse().map((msg) => ({
+    // 4) Format chat history for the LLM (already in chronological order)
+    const chatHistory = lastMessages.map((msg) => ({
         role: msg.role,
         content: msg.content
     }));
 
     const formattedHistory = chatHistory
-        .map(msg => `${msg.role.toUpperCase}: ${msg.content}`)
+        .map(msg => `${msg.role.toUpperCase()}: ${msg.content}`)
         .join('\n')
 
     console.log(`☑️ fetched ${chatHistory.length} previous messages for context \n`);
