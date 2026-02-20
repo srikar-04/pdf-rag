@@ -1,10 +1,10 @@
 import * as z from 'zod'
 
-const UserMessageSchema = z.object({
-    content: z.string().trim().min(1, {error: 'message cannot be empyt'}).max(1000, {error: 'message cannot exceed 1000 characters'})
+export const UserMessageSchema = z.object({
+    content: z.string().trim().min(1, {error: 'message cannot be empyt'}).max(1000, {error: 'message cannot exceed 1000 characters'}).transform(val => val.trim())
 })
 
-const UserMessageUpdateSchema = z.object({
+export const UserMessageUpdateSchema = z.object({
     content: z.string().trim().min(1, {error: 'message cannot be empyt'}).max(1000, {error: 'message cannot exceed 1000 characters'}).optional()
 })
 
