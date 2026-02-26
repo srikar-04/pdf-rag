@@ -1,59 +1,126 @@
-import './App.css'
-import SignIn from './pages/SignIn'
-import SignOut from './pages/SignOut'
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from 'sonner';
+import { useAuthStore } from './lib/store';
+import { ProtectedRoute, PublicOnlyRoute } from './components/shared';
+
+// Import existing pages (will enhance later)
+import SignIn from './pages/Auth/SignIn';
+
+// Create React Query client
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+
+/**
+ * App Component
+ * 
+ * Structure:
+ * 1. QueryClientProvider - React Query context
+ * 2. BrowserRouter - Routing context
+ * 3. Toaster - Toast notifications (Sonner)
+ * 4. Routes - Application routes
+ * 
+ * Routes:
+ * - /auth/signin - Login page (public only)
+ * - /dashboard - Main dashboard (protected)
+ * - /chat/:chatId - Chat interface (protected)
+ * - /documents - Document library (protected)
+ * - / - Redirect to dashboard
+ */
 
 function App() {
+  const { checkSession } = useAuthStore();
 
-  const [user, setUser] = useState(null)
-  const [provider, setProvider] = useState('google')
-
+  // Check session on app mount
   useEffect(() => {
-    const checkSession = async () => {
-      try {
-        const response = await fetch('http://localhost:3000/api/v1/auth/session', {
-            // Include credentials (cookies) in the request
-            credentials: 'include'
-        })
-        const result = await response.json()
-        if (result.success && result.data.user) {
-          console.log('complete data from backend : ', result)
-          setUser(() => result.data.user)
-          console.log('user : ', user)
-        }
-      } catch (error) {
-        console.error('Failed to check session:', error)
-      }
-    }
-    checkSession()
-  }, [])
+    checkSession();
+  }, [checkSession]);
 
-const handleSignIn = () => {
-
-  console.log('provider in frontend : ', provider)
-
-  // const form = document.createElement('form')
-  // form.method = 'POST'
-  // form.action = `http://localhost:3000/auth/signin/${provider}`
-  // document.body.appendChild(form)
-  // form.submit()
-
-  window.location.href = `http://localhost:3000/auth/signin?provider=${provider}&callbackUrl=http://localhost:5173`
-}
-
-  const handleSignOut = () => {
-    setUser(null)
-    window.location.href = "http://localhost:3000/auth/signout?callbackUrl=http://localhost:5173"   
-  }
   return (
-    <>
-      <main>
-        <div>
-          {!user ? <SignIn onSignIn={handleSignIn} setProvider={setProvider} /> : <SignOut onSignOut={handleSignOut} />}
-        </div>
-      </main>
-    </>
-  )
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        {/* Toast notifications */}
+        <Toaster 
+          position="top-right"
+          toastOptions={{
+            style: {
+              background: '#1a1a1a',
+              border: '1px solid rgba(255,255,255,0.1)',
+              color: '#fafafa',
+            },
+          }}
+        />
+        
+        <Routes>
+          {/* Public Routes - Auth Pages */}
+          <Route element={<PublicOnlyRoute />}>
+            <Route path="/auth/signin" element={<SignIn />} />
+            {/* Add more auth routes here: signup, forgot-password, etc. */}
+          </Route>
+
+          {/* Protected Routes - App Pages */}
+          <Route element={<ProtectedRoute />}>
+            {/* Dashboard - Main landing after auth */}
+            <Route 
+              path="/dashboard" 
+              element={
+                <div className="min-h-screen bg-[#0a0a0a] text-white p-8">
+                  <h1 className="text-2xl font-bold">Dashboard</h1>
+                  <p className="text-white/60 mt-2">Coming soon...</p>
+                </div>
+              } 
+            />
+            
+            {/* Chat Interface */}
+            <Route 
+              path="/chat/:chatId" 
+              element={
+                <div className="min-h-screen bg-[#0a0a0a] text-white p-8">
+                  <h1 className="text-2xl font-bold">Chat</h1>
+                  <p className="text-white/60 mt-2">Coming soon...</p>
+                </div>
+              } 
+            />
+            
+            {/* Documents Library */}
+            <Route 
+              path="/documents" 
+              element={
+                <div className="min-h-screen bg-[#0a0a0a] text-white p-8">
+                  <h1 className="text-2xl font-bold">Documents</h1>
+                  <p className="text-white/60 mt-2">Coming soon...</p>
+                </div>
+              } 
+            />
+          </Route>
+
+          {/* Default Redirects */}
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          
+          {/* 404 - Catch all */}
+          <Route 
+            path="*" 
+            element={
+              <div className="min-h-screen bg-[#0a0a0a] text-white flex items-center justify-center">
+                <div className="text-center">
+                  <h1 className="text-4xl font-bold mb-4">404</h1>
+                  <p className="text-white/60">Page not found</p>
+                </div>
+              </div>
+            } 
+          />
+        </Routes>
+      </BrowserRouter>
+    </QueryClientProvider>
+  );
 }
 
-export default App
+export default App;
