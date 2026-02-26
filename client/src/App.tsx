@@ -3,12 +3,20 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
 import { useAuthStore } from './lib/store';
-import { ProtectedRoute, PublicOnlyRoute } from './components/shared';
+import { PublicOnlyRoute } from './components/shared';
+import { MainLayout } from './components/layout';
 
-// Import existing pages (will enhance later)
+// Page imports
 import SignIn from './pages/Auth/SignIn';
+import Dashboard from './pages/Dashboard';
 
-// Create React Query client
+/**
+ * React Query Client Configuration
+ * 
+ * - staleTime: Data is fresh for 5 minutes
+ * - retry: Failed requests retry once
+ * - refetchOnWindowFocus: Don't refetch when user returns to tab
+ */
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -22,18 +30,18 @@ const queryClient = new QueryClient({
 /**
  * App Component
  * 
- * Structure:
- * 1. QueryClientProvider - React Query context
- * 2. BrowserRouter - Routing context
- * 3. Toaster - Toast notifications (Sonner)
- * 4. Routes - Application routes
+ * Application structure:
+ * 1. QueryClientProvider - React Query for server state
+ * 2. BrowserRouter - Client-side routing
+ * 3. Toaster - Toast notifications
+ * 4. Routes - Protected and public routes
  * 
- * Routes:
- * - /auth/signin - Login page (public only)
- * - /dashboard - Main dashboard (protected)
- * - /chat/:chatId - Chat interface (protected)
- * - /documents - Document library (protected)
- * - / - Redirect to dashboard
+ * Route Structure:
+ * - /auth/signin - Public (redirects if logged in)
+ * - /dashboard - Protected (requires auth)
+ * - /chat/:chatId - Protected
+ * - /documents - Protected
+ * - /* - 404
  */
 
 function App() {
@@ -60,52 +68,40 @@ function App() {
         />
         
         <Routes>
-          {/* Public Routes - Auth Pages */}
+          {/* ==============================
+              PUBLIC ROUTES
+              (Accessible without login)
+          =============================== */}
           <Route element={<PublicOnlyRoute />}>
             <Route path="/auth/signin" element={<SignIn />} />
-            {/* Add more auth routes here: signup, forgot-password, etc. */}
           </Route>
 
-          {/* Protected Routes - App Pages */}
-          <Route element={<ProtectedRoute />}>
-            {/* Dashboard - Main landing after auth */}
-            <Route 
-              path="/dashboard" 
-              element={
-                <div className="min-h-screen bg-[#0a0a0a] text-white p-8">
-                  <h1 className="text-2xl font-bold">Dashboard</h1>
-                  <p className="text-white/60 mt-2">Coming soon...</p>
-                </div>
-              } 
-            />
+          {/* ==============================
+              PROTECTED ROUTES
+              (Require authentication)
+          =============================== */}
+          <Route element={<MainLayout />}>
+            <Route path="/dashboard" element={<Dashboard />} />
             
-            {/* Chat Interface */}
-            <Route 
-              path="/chat/:chatId" 
-              element={
-                <div className="min-h-screen bg-[#0a0a0a] text-white p-8">
-                  <h1 className="text-2xl font-bold">Chat</h1>
-                  <p className="text-white/60 mt-2">Coming soon...</p>
-                </div>
-              } 
-            />
+            <Route path="/chat/:chatId" element={
+              <div className="min-h-screen flex items-center justify-center text-white/60">
+                Chat page coming soon...
+              </div>
+            } />
             
-            {/* Documents Library */}
-            <Route 
-              path="/documents" 
-              element={
-                <div className="min-h-screen bg-[#0a0a0a] text-white p-8">
-                  <h1 className="text-2xl font-bold">Documents</h1>
-                  <p className="text-white/60 mt-2">Coming soon...</p>
-                </div>
-              } 
-            />
+            <Route path="/documents" element={
+              <div className="min-h-screen flex items-center justify-center text-white/60">
+                Documents page coming soon...
+              </div>
+            } />
           </Route>
 
-          {/* Default Redirects */}
+          {/* ===============================
+              DEFAULT & FALLBACKS
+          =============================== */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           
-          {/* 404 - Catch all */}
+          {/* 404 - Page not found */}
           <Route 
             path="*" 
             element={
