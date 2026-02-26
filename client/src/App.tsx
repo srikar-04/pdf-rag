@@ -9,6 +9,8 @@ import { MainLayout } from './components/layout';
 // Page imports
 import SignIn from './pages/Auth/SignIn';
 import Dashboard from './pages/Dashboard';
+import ChatPage from './pages/Chat';
+import DocumentsPage from './pages/Document';
 
 /**
  * React Query Client Configuration
@@ -83,17 +85,11 @@ function App() {
           <Route element={<MainLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />
             
-            <Route path="/chat/:chatId" element={
-              <div className="min-h-screen flex items-center justify-center text-white/60">
-                Chat page coming soon...
-              </div>
-            } />
+            {/* Chat Interface */}
+            <Route path="/chat/:chatId" element={<ChatPage />} />
             
-            <Route path="/documents" element={
-              <div className="min-h-screen flex items-center justify-center text-white/60">
-                Documents page coming soon...
-              </div>
-            } />
+            {/* Documents Library */}
+            <Route path="/documents" element={<DocumentsPage />} />
           </Route>
 
           {/* ===============================
