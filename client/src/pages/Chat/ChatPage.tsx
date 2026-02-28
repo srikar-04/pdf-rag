@@ -157,6 +157,7 @@ export default function ChatPage() {
         onSend={handleSendMessage}
         isLoading={isStreaming || sendMessageMutation.isPending}
         disabled={sendMessageMutation.isPending}
+        chatId={chatId}
       />
     </div>
   );

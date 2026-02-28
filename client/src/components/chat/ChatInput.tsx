@@ -1,7 +1,8 @@
-import { useState, useRef, type KeyboardEvent } from 'react';
+import { useState, useRef, useEffect, type KeyboardEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, Paperclip, Loader2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { useDrafts } from '../../hooks/useDrafts';
 
 /**
  * ChatInput Component
@@ -15,12 +16,14 @@ import { cn } from '../../lib/utils';
  * - Keyboard shortcut (Enter to send, Shift+Enter for new line)
  * - Character count
  * - Disabled state when loading
+ * - Auto-save drafts to localStorage
  * 
  * Props:
  * - onSend: Callback when message is sent
  * - isLoading: Whether to show loading state
  * - disabled: Whether input is disabled
  * - placeholder: Placeholder text
+ * - chatId: Chat ID for draft saving
  */
 
 interface ChatInputProps {
@@ -28,16 +31,35 @@ interface ChatInputProps {
   isLoading?: boolean;
   disabled?: boolean;
   placeholder?: string;
+  chatId?: string;
 }
 
 export function ChatInput({ 
   onSend, 
   isLoading = false, 
   disabled = false,
-  placeholder = 'Ask a question about your document...'
+  placeholder = 'Ask a question about your document...',
+  chatId
 }: ChatInputProps) {
   const [message, setMessage] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  
+  // Auto-save drafts
+  const { draft: savedDraft, hasDraft, updateDraft, clearDraft } = useDrafts(chatId);
+
+  // Restore draft on mount (only once)
+  useEffect(() => {
+    if (hasDraft && savedDraft && !message) {
+      setMessage(savedDraft);
+      // Auto-resize textarea after restoring draft
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.style.height = 'auto';
+          textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 150)}px`;
+        }
+      }, 0);
+    }
+  }, [hasDraft, savedDraft]);
 
   // Handle send
   const handleSend = () => {
@@ -45,6 +67,7 @@ export function ChatInput({
     
     onSend(message.trim());
     setMessage('');
+    clearDraft();
     
     // Reset textarea height
     if (textareaRef.current) {
@@ -68,6 +91,8 @@ export function ChatInput({
       textarea.style.height = 'auto';
       textarea.style.height = `${Math.min(textarea.scrollHeight, 150)}px`;
     }
+    // Update draft
+    updateDraft(textarea?.value || '');
   };
 
   const canSend = message.trim().length > 0 && !isLoading && !disabled;
@@ -75,6 +100,22 @@ export function ChatInput({
   return (
     <div className="border-t border-white/5 bg-[#0a0a0a] px-4 py-4">
       <div className="max-w-3xl mx-auto">
+        {/* Draft indicator */}
+        {hasDraft && !message && (
+          <div className="mb-2 flex items-center gap-2 text-xs text-amber-400/70">
+            <span>You have an unsaved draft</span>
+            <button 
+              onClick={() => {
+                setMessage(savedDraft);
+                clearDraft();
+              }}
+              className="hover:text-amber-400 underline"
+            >
+              Restore
+            </button>
+          </div>
+        )}
+
         {/* Input Container */}
         <div className={cn(
           'relative flex items-end gap-2 rounded-xl border transition-colors',
