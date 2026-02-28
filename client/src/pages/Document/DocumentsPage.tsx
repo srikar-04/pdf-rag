@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useDocuments } from '../../hooks';
+import { useDocuments, useDeleteDocument, useCreateChat } from '../../hooks';
 import { DocumentCard, UploadDropzone } from '../../components/document';
 import { Button, Card, CardContent } from '../../components/ui';
-import { Plus, Search, FileText, Filter } from 'lucide-react';
+import { Plus, Search, FileText, Filter, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 /**
@@ -22,23 +22,65 @@ import { toast } from 'sonner';
 export default function DocumentsPage() {
   const navigate = useNavigate();
   const { data: documents, isLoading } = useDocuments();
+  const deleteDocumentMutation = useDeleteDocument();
+  const createChatMutation = useCreateChat();
   const [searchQuery, setSearchQuery] = useState('');
   const [showUpload, setShowUpload] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   // Filter documents by search
   const filteredDocuments = documents?.filter(doc =>
     doc.documentName.toLowerCase().includes(searchQuery.toLowerCase())
   ) || [];
 
-  // Handle document selection (start chat with document)
-  const handleSelectDocument = (docId: string) => {
-    navigate(`/chat/${docId}`);
+  // Handle document selection (create chat with document)
+  const handleSelectDocument = async (docId: string) => {
+    try {
+      // Find the document name
+      const doc = documents?.find(d => d.id === docId);
+      const docName = doc?.documentName.replace('.pdf', '') || 'New Chat';
+      
+      // Create a new chat with this document
+      const newChat = await createChatMutation.mutateAsync({
+        title: docName,
+      });
+      toast.success('Chat created');
+      navigate(`/chat/${newChat.id}`);
+    } catch (error) {
+      toast.error('Failed to create chat');
+    }
   };
 
   // Handle document deletion
-  const handleDeleteDocument = (_docId: string) => {
-    // TODO: Implement delete mutation
-    toast.info('Delete functionality coming soon');
+  const handleDeleteDocument = async (docId: string) => {
+    if (!confirm('Are you sure you want to delete this document? This action cannot be undone.')) {
+      return;
+    }
+    
+    try {
+      await deleteDocumentMutation.mutateAsync(docId);
+      toast.success('Document deleted');
+    } catch (error) {
+      toast.error('Failed to delete document');
+    }
+  };
+
+  // Handle file upload (create chat first, then upload)
+  const handleFileUpload = async (file: File) => {
+    try {
+      setUploading(true);
+      
+      // Create a new chat first
+      const newChat = await createChatMutation.mutateAsync({
+        title: file.name.replace('.pdf', ''),
+      });
+      
+      // Navigate to the chat with upload
+      navigate(`/chat/${newChat.id}`, { state: { pendingUpload: file } });
+    } catch (error) {
+      toast.error('Failed to start upload');
+      setUploading(false);
+    }
   };
 
   return (
@@ -69,11 +111,16 @@ export default function DocumentsPage() {
             <p className="text-sm text-white/50 mb-4">
               Upload a PDF file to chat with. Maximum file size: 10MB
             </p>
-            <UploadDropzone
-              onFileSelect={(_file) => {
-                toast.info('Upload functionality - connect to your chat first');
-              }}
-            />
+            {uploading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+                <span className="ml-3 text-white/60">Creating chat...</span>
+              </div>
+            ) : (
+              <UploadDropzone
+                onFileSelect={handleFileUpload}
+              />
+            )}
           </CardContent>
         </Card>
       )}

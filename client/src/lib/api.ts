@@ -152,6 +152,7 @@ api.interceptors.response.use(
  * API Endpoints
  * 
  * Organized by feature for easy imports
+ * NOTE: Some endpoints may differ from ideal REST design due to backend constraints
  */
 export const apiEndpoints = {
   // Auth
@@ -163,7 +164,7 @@ export const apiEndpoints = {
   // Chats
   chats: {
     list: () => api.get('/chat'),
-    create: (data: { title: string }) => api.post('/chat', data),
+    create: (data: { title: string }) => api.post('/chat/create-chat', data),
     get: (chatId: string) => api.get(`/chat/${chatId}`),
     delete: (chatId: string) => api.delete(`/chat/${chatId}`),
   },
@@ -172,7 +173,7 @@ export const apiEndpoints = {
   messages: {
     list: (chatId: string) => api.get(`/chat/${chatId}/messages`),
     send: (chatId: string, documentId: string, query: string) =>
-      api.post(`/message/query/${chatId}/${documentId}`, { query }),
+      api.get(`/message/query/${chatId}/${documentId}`, { params: { query } }),
   },
   
   // Documents

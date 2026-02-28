@@ -1,6 +1,6 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../lib/store';
-import { useChats, useDocuments } from '../../hooks';
+import { useChats, useDocuments, useCreateChat } from '../../hooks';
 import { Button, Card, CardContent } from '../../components/ui';
 import { 
   Plus, 
@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '../../lib/utils';
+import { toast } from 'sonner';
 
 /**
  * Dashboard Page
@@ -28,8 +29,10 @@ import { cn } from '../../lib/utils';
 
 export default function Dashboard() {
   const { user } = useAuthStore();
+  const navigate = useNavigate();
   const { data: chats, isLoading: chatsLoading } = useChats();
   const { data: documents, isLoading: docsLoading } = useDocuments();
+  const createChatMutation = useCreateChat();
 
   // Get time-based greeting
   const getGreeting = () => {
@@ -82,14 +85,23 @@ export default function Dashboard() {
 
         {/* Quick Actions */}
         <div className="flex gap-3">
-          <Link to="/dashboard">
-            <Button 
-              variant="primary" 
-              leftIcon={<Plus className="w-4 h-4" />}
-            >
-              New Chat
-            </Button>
-          </Link>
+          <Button 
+            variant="primary" 
+            leftIcon={<Plus className="w-4 h-4" />}
+            onClick={async () => {
+              try {
+                const newChat = await createChatMutation.mutateAsync({
+                  title: 'New Chat',
+                });
+                navigate(`/chat/${newChat.id}`);
+              } catch (error) {
+                toast.error('Failed to create chat');
+              }
+            }}
+            isLoading={createChatMutation.isPending}
+          >
+            New Chat
+          </Button>
         </div>
       </div>
 

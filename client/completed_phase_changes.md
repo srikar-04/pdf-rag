@@ -250,6 +250,27 @@ npm install react-router-dom axios @tanstack/react-query zustand framer-motion l
 
 ---
 
+## Phase 4 (Final): Bug Fixes & Optimizations ✅
+
+### Completed: February 2026
+
+### Bugs Fixed:
+
+#### Dashboard (`src/pages/Dashboard/Dashboard.tsx`)
+- Fixed "New Chat" button to actually create chat via API instead of just linking to /dashboard
+
+#### DocumentsPage (`src/pages/Document/DocumentsPage.tsx`)
+- Integrated delete document functionality with useDeleteDocument hook
+- Fixed upload to create a new chat first, then navigate with pending file
+- Document selection now creates a new chat with document name as title
+
+#### API (`src/lib/api.ts`)
+- Fixed `createChat` to use `/chat/create-chat` endpoint
+- Fixed `sendMessage` to use GET method instead of POST
+- Updated query parameter passing
+
+---
+
 ## Known Issues / Backend API Mismatch
 
 > ⚠️ See `backend_api_issues.md` for detailed list of API mismatches
