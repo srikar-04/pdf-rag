@@ -1,5 +1,5 @@
-import { Link, useLocation } from 'react-router-dom';
-import { useChats } from '../../hooks';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useChats, useCreateChat, useDeleteChat } from '../../hooks';
 import { Button } from '../ui';
 import { 
   FileText, 
@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '../../lib/utils';
+import { toast } from 'sonner';
 
 /**
  * Sidebar Component
@@ -34,7 +35,10 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   const location = useLocation();
+  const navigate = useNavigate();
   const { data: chats, isLoading } = useChats();
+  const createChatMutation = useCreateChat();
+  const deleteChatMutation = useDeleteChat();
   const [searchQuery, setSearchQuery] = useState('');
 
   // Navigation items
@@ -58,6 +62,39 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
 
   // Check if route is active
   const isActive = (href: string) => location.pathname === href;
+
+  // Handle create new chat
+  const handleNewChat = async () => {
+    try {
+      const newChat = await createChatMutation.mutateAsync({
+        title: 'New Chat',
+      });
+      toast.success('Chat created');
+      navigate(`/chat/${newChat.id}`);
+      if (onClose) onClose();
+    } catch (error) {
+      toast.error('Failed to create chat');
+    }
+  };
+
+  // Handle delete chat
+  const handleDeleteChat = async (e: React.MouseEvent, chatId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!confirm('Are you sure you want to delete this chat?')) return;
+    
+    try {
+      await deleteChatMutation.mutateAsync(chatId);
+      toast.success('Chat deleted');
+      // If we're on the deleted chat, redirect to dashboard
+      if (location.pathname === `/chat/${chatId}`) {
+        navigate('/dashboard');
+      }
+    } catch (error) {
+      toast.error('Failed to delete chat');
+    }
+  };
 
   return (
     <>
@@ -104,17 +141,16 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
 
           {/* New Chat Button */}
           <div className="p-3">
-            <Link to="/dashboard">
-              <Button
-                variant="primary"
-                size="sm"
-                fullWidth
-                leftIcon={<Plus className="w-4 h-4" />}
-                onClick={onClose}
-              >
-                New Chat
-              </Button>
-            </Link>
+            <Button
+              variant="primary"
+              size="sm"
+              fullWidth
+              leftIcon={<Plus className="w-4 h-4" />}
+              onClick={handleNewChat}
+              isLoading={createChatMutation.isPending}
+            >
+              New Chat
+            </Button>
           </div>
 
           {/* Chat History Section */}
@@ -171,17 +207,15 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
                         location.pathname === `/chat/${chat.id}` && 'bg-indigo-500/10 text-indigo-400'
                       )}
                     >
-                      <Bot className="w-4 h-4 flex-shrink-0" />
+                      <Bot className="w-4 h-4 shrink-0" />
                       <span className="truncate flex-1">
                         {chat.title}
                       </span>
                       {/* Delete button (visible on hover) */}
                       <button
                         className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-500/10 text-white/40 hover:text-red-400 transition-all"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          // TODO: Implement delete chat
-                        }}
+                        onClick={(e) => handleDeleteChat(e, chat.id)}
+                        aria-label="Delete chat"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>

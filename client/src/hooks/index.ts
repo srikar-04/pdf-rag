@@ -46,6 +46,26 @@ export const useChats = (options?: UseQueryOptions<Chat[], Error>) => {
 };
 
 /**
+ * Hook: useChat
+ * Fetch a single chat by ID
+ */
+export const useChat = (
+  chatId: string,
+  options?: UseQueryOptions<Chat, Error>
+) => {
+  return useQuery<Chat, Error>({
+    queryKey: ['chat', chatId],
+    queryFn: async () => {
+      const response = await apiEndpoints.chats.get(chatId);
+      return response.data.data;
+    },
+    enabled: !!chatId,
+    staleTime: 1 * 60 * 1000, // 1 minute
+    ...options,
+  });
+};
+
+/**
  * Hook: useCreateChat
  * Create a new chat
  */
@@ -225,6 +245,46 @@ export const useIngestDocument = (
   return useMutation<void, Error, string>({
     mutationFn: async (documentId) => {
       await apiEndpoints.documents.ingest(documentId);
+    },
+    ...options,
+  });
+};
+
+/**
+ * Hook: useDeleteChat
+ * Delete a chat and all its messages
+ */
+export const useDeleteChat = (
+  options?: UseMutationOptions<void, Error, string>
+) => {
+  const queryClient = useQueryClient();
+  
+  return useMutation<void, Error, string>({
+    mutationFn: async (chatId) => {
+      await apiEndpoints.chats.delete(chatId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['chats'] });
+    },
+    ...options,
+  });
+};
+
+/**
+ * Hook: useDeleteDocument
+ * Delete a document
+ */
+export const useDeleteDocument = (
+  options?: UseMutationOptions<void, Error, string>
+) => {
+  const queryClient = useQueryClient();
+  
+  return useMutation<void, Error, string>({
+    mutationFn: async (documentId) => {
+      await apiEndpoints.documents.delete(documentId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
     },
     ...options,
   });

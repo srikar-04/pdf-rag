@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { MessageList, ChatInput } from '../../components/chat';
 import { DocumentUpload } from '../../components/document';
-import { useMessages, useSendMessage } from '../../hooks';
+import { useMessages, useSendMessage, useChat } from '../../hooks';
 import { useAppStore } from '../../lib/store';
 import { Button } from '../../components/ui';
-import { FileText } from 'lucide-react';
+import { FileText, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 /**
@@ -30,8 +30,12 @@ export default function ChatPage() {
   const [showUpload, setShowUpload] = useState(false);
 
   // React Query hooks
-  const { data: messages, isLoading, error } = useMessages(chatId || '');
+  const { data: chat, isLoading: chatLoading } = useChat(chatId || '');
+  const { data: messages, isLoading: messagesLoading } = useMessages(chatId || '');
   const sendMessageMutation = useSendMessage();
+
+  // Get first document ID from chat
+  const documentId = chat?.documents?.[0]?.id;
 
   // Zustand store for streaming state
   const { isStreaming, startStreaming, endStreaming } = useAppStore();
@@ -43,13 +47,18 @@ export default function ChatPage() {
       return;
     }
 
+    if (!documentId) {
+      toast.error('No document attached to this chat. Please upload a document first.');
+      return;
+    }
+
     // Start streaming state
     startStreaming();
 
     try {
       await sendMessageMutation.mutateAsync({
         chatId,
-        documentId: 'default-doc-id', // TODO: Get from chat
+        documentId,
         query: content,
       });
       toast.success('Message sent');
@@ -61,28 +70,53 @@ export default function ChatPage() {
     }
   };
 
+  // Combined loading state
+  const isLoading = chatLoading || messagesLoading;
+
   // Loading state
   if (isLoading) {
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-white/50">Loading messages...</p>
+          <p className="text-sm text-white/50">Loading...</p>
         </div>
       </div>
     );
   }
 
-  // Error state
-  if (error) {
+  // No document attached state
+  if (!documentId) {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-400 mb-2">Failed to load messages</p>
-          <Button variant="ghost" size="sm" onClick={() => window.location.reload()}>
-            Retry
-          </Button>
+      <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
+        <div className="w-20 h-20 rounded-2xl bg-amber-500/10 flex items-center justify-center mb-4">
+          <AlertCircle className="w-10 h-10 text-amber-400" />
         </div>
+        <h3 className="text-lg font-medium text-white mb-2">
+          No document attached
+        </h3>
+        <p className="text-sm text-white/50 max-w-sm mb-6">
+          Upload a PDF document to this chat to start asking questions about it.
+        </p>
+        <Button
+          variant="primary"
+          onClick={() => setShowUpload(true)}
+          leftIcon={<FileText className="w-4 h-4" />}
+        >
+          Upload Document
+        </Button>
+
+        {showUpload && (
+          <div className="mt-6 w-full max-w-xl">
+            <DocumentUpload
+              chatId={chatId || ''}
+              onUploadComplete={() => {
+                setShowUpload(false);
+                toast.success('Document uploaded and ready!');
+              }}
+            />
+          </div>
+        )}
       </div>
     );
   }

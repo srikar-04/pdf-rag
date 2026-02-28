@@ -1,16 +1,29 @@
-import { useEffect } from 'react';
+import { useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
 import { useAuthStore } from './lib/store';
-import { PublicOnlyRoute } from './components/shared';
+import { PublicOnlyRoute, ErrorBoundary } from './components/shared';
 import { MainLayout } from './components/layout';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 
-// Page imports
-import SignIn from './pages/Auth/SignIn';
-import Dashboard from './pages/Dashboard';
-import ChatPage from './pages/Chat';
-import DocumentsPage from './pages/Document';
+// Lazy load pages for code splitting
+const SignIn = lazy(() => import('./pages/Auth/SignIn'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const ChatPage = lazy(() => import('./pages/Chat'));
+const DocumentsPage = lazy(() => import('./pages/Document'));
+
+// Loading fallback component
+function PageLoader() {
+  return (
+    <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm text-white/50">Loading...</p>
+      </div>
+    </div>
+  );
+}
 
 /**
  * React Query Client Configuration
@@ -49,69 +62,76 @@ const queryClient = new QueryClient({
 function App() {
   const { checkSession } = useAuthStore();
 
+  // Enable global keyboard shortcuts
+  useKeyboardShortcuts();
+
   // Check session on app mount
   useEffect(() => {
     checkSession();
   }, [checkSession]);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        {/* Toast notifications */}
-        <Toaster 
-          position="top-right"
-          toastOptions={{
-            style: {
-              background: '#1a1a1a',
-              border: '1px solid rgba(255,255,255,0.1)',
-              color: '#fafafa',
-            },
-          }}
-        />
-        
-        <Routes>
-          {/* ==============================
-              PUBLIC ROUTES
-              (Accessible without login)
-          =============================== */}
-          <Route element={<PublicOnlyRoute />}>
-            <Route path="/auth/signin" element={<SignIn />} />
-          </Route>
-
-          {/* ==============================
-              PROTECTED ROUTES
-              (Require authentication)
-          =============================== */}
-          <Route element={<MainLayout />}>
-            <Route path="/dashboard" element={<Dashboard />} />
-            
-            {/* Chat Interface */}
-            <Route path="/chat/:chatId" element={<ChatPage />} />
-            
-            {/* Documents Library */}
-            <Route path="/documents" element={<DocumentsPage />} />
-          </Route>
-
-          {/* ===============================
-              DEFAULT & FALLBACKS
-          =============================== */}
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          
-          {/* 404 - Page not found */}
-          <Route 
-            path="*" 
-            element={
-              <div className="min-h-screen bg-[#0a0a0a] text-white flex items-center justify-center">
-                <div className="text-center">
-                  <h1 className="text-4xl font-bold mb-4">404</h1>
-                  <p className="text-white/60">Page not found</p>
-                </div>
-              </div>
-            } 
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          {/* Toast notifications */}
+          <Toaster 
+            position="top-right"
+            toastOptions={{
+              style: {
+                background: '#1a1a1a',
+                border: '1px solid rgba(255,255,255,0.1)',
+                color: '#fafafa',
+              },
+            }}
           />
-        </Routes>
-      </BrowserRouter>
-    </QueryClientProvider>
+          
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              {/* ==============================
+                  PUBLIC ROUTES
+                  (Accessible without login)
+              =============================== */}
+              <Route element={<PublicOnlyRoute />}>
+                <Route path="/auth/signin" element={<SignIn />} />
+              </Route>
+
+              {/* ==============================
+                  PROTECTED ROUTES
+                  (Require authentication)
+              =============================== */}
+              <Route element={<MainLayout />}>
+                <Route path="/dashboard" element={<Dashboard />} />
+                
+                {/* Chat Interface */}
+                <Route path="/chat/:chatId" element={<ChatPage />} />
+                
+                {/* Documents Library */}
+                <Route path="/documents" element={<DocumentsPage />} />
+              </Route>
+
+              {/* ===============================
+                  DEFAULT & FALLBACKS
+              =============================== */}
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              
+              {/* 404 - Page not found */}
+              <Route 
+                path="*" 
+                element={
+                  <div className="min-h-screen bg-[#0a0a0a] text-white flex items-center justify-center">
+                    <div className="text-center">
+                      <h1 className="text-4xl font-bold mb-4">404</h1>
+                      <p className="text-white/60">Page not found</p>
+                    </div>
+                  </div>
+                } 
+              />
+            </Routes>
+          </Suspense>
+        </BrowserRouter>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 
