@@ -19,7 +19,7 @@ export const query = asyncHandler(async (req: Request, res: Response, next: Next
     const chatId = req.params.chatId as string
     const user = req.user
     const documentId = req.params.documentId as string
-    const query = req.body.query
+    const query = req.body.content  // Fixed: was req.body.query, should be req.body.content
 
     if (!user) throw new ApiError(404, 'un-authenticated user in query handler ')
 

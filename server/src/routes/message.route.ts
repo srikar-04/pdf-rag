@@ -7,7 +7,7 @@ import { UserMessageSchema } from "../schemas/message.schema.js";
 
 const router = Router()
 
-router.route('/query/:chatId/:documentId').get(
+router.route('/query/:chatId/:documentId').post(
     authMiddleware,
     queryLimiter, // Rate limit: 30 queries per minute
     validateBody(UserMessageSchema), // validate query body

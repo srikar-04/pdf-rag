@@ -3,9 +3,15 @@ import authMiddleware from "../middlewares/auth.middleware.js";
 import { upload } from "../middlewares/multer.middleware.js";
 import { uploadLimiter } from "../middlewares/rateLimit.middleware.js";
 import { validatePdfUpload } from "../middlewares/pdfValidation.middleware.js";
-import { documentUpload, ingestDocument, documentStatus } from "../controllers/document.controller.js";
+import { documentUpload, ingestDocument, documentStatus, getAllDocuments, deleteDocument } from "../controllers/document.controller.js";
 
 const router = Router()
+
+// Get all documents for current user (Priority: P1)
+router.route('/').get(
+    authMiddleware,
+    getAllDocuments
+)
 
 router
     .route('/upload/:chatId')
@@ -35,7 +41,11 @@ router
         documentStatus
     )
 
-    // deleting document
+    // Delete document (Priority: P2)
+    router.route('/:documentId').delete(
+        authMiddleware,
+        deleteDocument
+    )
 
 
 export default router

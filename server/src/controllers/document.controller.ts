@@ -263,3 +263,77 @@ export const documentStatus = asyncHandler(async (req: Request, res: Response, n
     res.json(new ApiResponse(201, docDB, 'successfully fetched doc status details'))
 
 })
+
+
+/**
+ * Get All Documents
+ * Priority: P1 - Critical
+ * 
+ * Lists all documents for the current authenticated user
+ * Returns documents sorted by createdAt (most recent first)
+ */
+export const getAllDocuments = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    const userId = req.user?.id;
+
+    if (!userId) {
+        throw new ApiError(401, "Unauthorized, userId not found");
+    }
+
+    const documents = await prisma.document.findMany({
+        where: {
+            userId: userId,
+        },
+        select: {
+            id: true,
+            documentName: true,
+            storagePath: true,
+            documentStatus: true,
+            ingestionStep: true,
+            documentHash: true,
+        },
+    });
+
+    res.json(new ApiResponse(200, documents, "Documents fetched successfully"));
+})
+
+
+/**
+ * Delete Document
+ * Priority: P2 - Important
+ * 
+ * Deletes a document and all associated data
+ * This will cascade delete: ChunkHash, ChatDocument relations, DocumentMetadata
+ */
+export const deleteDocument = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    const userId = req.user?.id;
+    const { documentId } = req.params;
+
+    if (!userId) {
+        throw new ApiError(401, "Unauthorized, userId not found");
+    }
+
+    if (!documentId || Array.isArray(documentId)) {
+        throw new ApiError(400, "Valid Document ID is required");
+    }
+
+    // Verify document belongs to user before deletion
+    const document = await prisma.document.findFirst({
+        where: {
+            id: documentId,
+            userId: userId,
+        },
+    });
+
+    if (!document) {
+        throw new ApiError(404, "Document not found or unauthorized");
+    }
+
+    // Delete document (will cascade delete chunks, metadata, and ChatDocument relations)
+    await prisma.document.delete({
+        where: {
+            id: documentId,
+        },
+    });
+
+    res.json(new ApiResponse(200, {}, "Document deleted successfully"));
+})
