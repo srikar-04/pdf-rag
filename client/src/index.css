@@ -1,5 +1,26 @@
-/* Import Tailwind CSS */
 @import "tailwindcss";
 
-/* Import custom global styles */
-@import "./styles/globals.css";
+/* Essential CSS variables for the app */
+:root {
+  --bg-primary: #0a0a0a;
+  --bg-secondary: #141414;
+  --bg-tertiary: #1a1a1a;
+  --bg-elevated: #242424;
+  --text-primary: #fafafa;
+  --text-secondary: #a3a3a3;
+  --accent-primary: #6366f1;
+  --glass-bg: rgba(255, 255, 255, 0.03);
+  --glass-border: rgba(255, 255, 255, 0.08);
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.glass {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}

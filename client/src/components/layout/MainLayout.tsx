@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
+import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 
 /**
  * MainLayout Component
@@ -15,6 +16,7 @@ import { Sidebar } from './Sidebar';
  * - Responsive: Sidebar collapses on mobile
  * - Mobile menu toggle in header
  * - Smooth transitions
+ * - Keyboard shortcuts
  * 
  * Usage:
  * <MainLayout>
@@ -25,6 +27,9 @@ import { Sidebar } from './Sidebar';
 export function MainLayout() {
   // Mobile menu state
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Enable keyboard shortcuts (this component is inside Router)
+  useKeyboardShortcuts();
 
   // Toggle mobile menu
   const handleMenuToggle = () => {

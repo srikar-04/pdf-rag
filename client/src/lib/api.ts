@@ -158,6 +158,7 @@ export const apiEndpoints = {
   // Auth - Session only (logout handled by OAuth)
   auth: {
     session: () => api.get('/auth/session'),
+    register: (username: string) => api.post('/auth/register', { username }),
   },
   
   // Chats

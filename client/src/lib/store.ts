@@ -3,6 +3,12 @@ import { persist } from 'zustand/middleware';
 import type { User } from '../types';
 import { apiEndpoints } from './api';
 
+// Backend base URL for redirects (without /api/v1)
+const getBackendUrl = () => {
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+  return apiUrl.replace('/api/v1', '');
+};
+
 /**
  * Auth Store (Zustand)
  * 
@@ -23,12 +29,14 @@ interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  onBoardingRequired: boolean;
   
   // Actions
   setUser: (user: User | null) => void;
   checkSession: () => Promise<void>;
   logout: () => Promise<void>;
   clearAuth: () => void;
+  registerUser: (username: string) => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -38,6 +46,7 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       isAuthenticated: false,
       isLoading: true,
+      onBoardingRequired: false,
       
       /**
        * Set user directly (used after login/onboarding)
@@ -46,7 +55,8 @@ export const useAuthStore = create<AuthState>()(
         set({ 
           user, 
           isAuthenticated: !!user,
-          isLoading: false 
+          isLoading: false,
+          onBoardingRequired: false,
         });
       },
       
@@ -65,12 +75,14 @@ export const useAuthStore = create<AuthState>()(
               user: response.data.data.user,
               isAuthenticated: true,
               isLoading: false,
+              onBoardingRequired: response.data.data.onBoardingRequired || false,
             });
           } else {
             set({
               user: null,
               isAuthenticated: false,
               isLoading: false,
+              onBoardingRequired: false,
             });
           }
         } catch (error) {
@@ -79,7 +91,28 @@ export const useAuthStore = create<AuthState>()(
             user: null,
             isAuthenticated: false,
             isLoading: false,
+            onBoardingRequired: false,
           });
+        }
+      },
+      
+      /**
+       * Register username for new users
+       */
+      registerUser: async (username: string) => {
+        try {
+          const response = await apiEndpoints.auth.register(username);
+          
+          if (response.data.success && response.data.data.user) {
+            set({
+              user: response.data.data.user,
+              isAuthenticated: true,
+              isLoading: false,
+              onBoardingRequired: false,
+            });
+          }
+        } catch (error) {
+          throw error;
         }
       },
       
@@ -94,8 +127,8 @@ export const useAuthStore = create<AuthState>()(
           get().clearAuth();
           
           // Redirect to OAuth signout to clear session cookie
-          // Auth.js creates /auth/signout route automatically
-          window.location.href = '/auth/signout';
+          // Auth.js creates /auth/signout route - need full backend URL
+          window.location.href = `${getBackendUrl()}/auth/signout`;
         } catch (error) {
           console.error('Logout error:', error);
           // Still clear auth state even if redirect fails

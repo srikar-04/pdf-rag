@@ -1,6 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { UploadDropzone } from './UploadDropzone';
-import { useUploadDocument, useDocumentStatus } from '../../hooks';
+import { useUploadDocument, useDocumentStatus, useIngestDocument } from '../../hooks';
 import { Button } from '../ui';
 import { toast } from 'sonner';
 import { FileText } from 'lucide-react';
@@ -40,35 +40,65 @@ export function DocumentUpload({ chatId, onUploadComplete }: DocumentUploadProps
     documentId?: string;
   }>({ status: 'idle', progress: 0 });
 
-  const uploadMutation = useUploadDocument({
-    onSuccess: (data) => {
-      setUploadState({
-        status: 'processing',
-        progress: 100,
-        fileName: data.documentEntry.documentName,
-        documentId: data.documentEntry.id,
-      });
-      toast.success('Upload complete! Processing document...');
+  // Upload mutation
+  const uploadMutation = useUploadDocument();
+
+  // Ingestion mutation - call after upload
+  const ingestMutation = useIngestDocument({
+    onSuccess: () => {
+      toast.info('Document processing started...');
     },
     onError: (error) => {
-      setUploadState({
-        status: 'error',
-        progress: 0,
-        error: error.message || 'Upload failed',
-      });
+      console.error('Ingestion error:', error);
     },
   });
+
+  // Handle upload success - call ingestion API
+  const handleUploadSuccess = async (data: { documentEntry: { id: string; documentName: string } }) => {
+    const docId = data.documentEntry.id;
+    
+    setUploadState({
+      status: 'processing',
+      progress: 100,
+      fileName: data.documentEntry.documentName,
+      documentId: docId,
+    });
+
+    // Call ingestion API to start processing pipeline
+    try {
+      await ingestMutation.mutateAsync(docId);
+    } catch (error) {
+      console.log('Ingestion call made, will poll for status');
+    }
+  };
+
+  // Handle upload error
+  const handleUploadError = (error: Error) => {
+    setUploadState({
+      status: 'error',
+      progress: 0,
+      error: error.message || 'Upload failed',
+    });
+  };
+
+  // Pass handlers to upload mutation
+  useEffect(() => {
+    // This is handled in handleFileSelect
+  }, []);
 
   // Poll document status while processing
   const { data: docStatus } = useDocumentStatus(uploadState.documentId || '');
 
   // Check if document is ready
-  if (docStatus?.documentStatus === 'ready') {
-    setUploadState(prev => ({ ...prev, status: 'success' }));
-    if (onUploadComplete) {
-      onUploadComplete(uploadState.documentId!);
+  useEffect(() => {
+    if (docStatus?.documentStatus === 'ready') {
+      setUploadState(prev => ({ ...prev, status: 'success' }));
+      toast.success('Document ready!');
+      if (onUploadComplete) {
+        onUploadComplete(uploadState.documentId!);
+      }
     }
-  }
+  }, [docStatus, onUploadComplete, uploadState.documentId]);
 
   // Handle file selection
   const handleFileSelect = useCallback(async (file: File) => {
@@ -102,11 +132,14 @@ export function DocumentUpload({ chatId, onUploadComplete }: DocumentUploadProps
     }, 200);
 
     try {
-      await uploadMutation.mutateAsync({ chatId, file });
+      const data = await uploadMutation.mutateAsync({ chatId, file });
+      await handleUploadSuccess(data);
+    } catch (error: any) {
+      handleUploadError(error);
     } finally {
       clearInterval(progressInterval);
     }
-  }, [chatId, uploadMutation]);
+  }, [chatId, uploadMutation, handleUploadSuccess, handleUploadError]);
 
   // Handle reset (start new upload)
   const handleReset = () => {

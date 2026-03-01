@@ -53,9 +53,11 @@ export default function DocumentsPage() {
 
   // Handle document deletion
   const handleDeleteDocument = async (docId: string) => {
-    if (!confirm('Are you sure you want to delete this document? This action cannot be undone.')) {
-      return;
-    }
+    // Show warning toast and proceed with delete
+    toast.warning('Deleting document...', {
+      description: 'This action cannot be undone.',
+      duration: 3000,
+    });
     
     try {
       await deleteDocumentMutation.mutateAsync(docId);

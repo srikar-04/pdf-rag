@@ -13,3 +13,5 @@ export type { CardProps } from './Card';
 
 export { Input, Textarea } from './Input';
 export type { InputProps, TextareaProps } from './Input';
+
+export { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from './Dialog';

@@ -3,12 +3,12 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
 import { useAuthStore } from './lib/store';
-import { PublicOnlyRoute, ErrorBoundary } from './components/shared';
+import { PublicOnlyRoute, OnboardingRoute, ErrorBoundary } from './components/shared';
 import { MainLayout } from './components/layout';
-import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 
 // Lazy load pages for code splitting
 const SignIn = lazy(() => import('./pages/Auth/SignIn'));
+const Onboarding = lazy(() => import('./pages/Auth/Onboarding'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const ChatPage = lazy(() => import('./pages/Chat'));
 const DocumentsPage = lazy(() => import('./pages/Document'));
@@ -62,9 +62,6 @@ const queryClient = new QueryClient({
 function App() {
   const { checkSession } = useAuthStore();
 
-  // Enable global keyboard shortcuts
-  useKeyboardShortcuts();
-
   // Check session on app mount
   useEffect(() => {
     checkSession();
@@ -94,6 +91,11 @@ function App() {
               =============================== */}
               <Route element={<PublicOnlyRoute />}>
                 <Route path="/auth/signin" element={<SignIn />} />
+              </Route>
+
+              {/* Onboarding Route - requires auth but no onboarding */}
+              <Route element={<OnboardingRoute />}>
+                <Route path="/auth/onboarding" element={<Onboarding />} />
               </Route>
 
               {/* ==============================

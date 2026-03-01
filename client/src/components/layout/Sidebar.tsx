@@ -1,6 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useChats, useCreateChat, useDeleteChat } from '../../hooks';
+import { useChats, useDeleteChat } from '../../hooks';
 import { Button } from '../ui';
+import { ChatNameDialog } from '../chat/ChatNameDialog';
 import { 
   FileText, 
   MessageSquare, 
@@ -37,9 +38,9 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { data: chats, isLoading } = useChats();
-  const createChatMutation = useCreateChat();
   const deleteChatMutation = useDeleteChat();
   const [searchQuery, setSearchQuery] = useState('');
+  const [isChatDialogOpen, setIsChatDialogOpen] = useState(false);
 
   // Navigation items
   const navItems = [
@@ -63,18 +64,9 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   // Check if route is active
   const isActive = (href: string) => location.pathname === href;
 
-  // Handle create new chat
-  const handleNewChat = async () => {
-    try {
-      const newChat = await createChatMutation.mutateAsync({
-        title: 'New Chat',
-      });
-      toast.success('Chat created');
-      navigate(`/chat/${newChat.id}`);
-      if (onClose) onClose();
-    } catch (error) {
-      toast.error('Failed to create chat');
-    }
+  // Handle create new chat - open dialog
+  const handleNewChat = () => {
+    setIsChatDialogOpen(true);
   };
 
   // Handle delete chat
@@ -82,7 +74,11 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
     e.preventDefault();
     e.stopPropagation();
     
-    if (!confirm('Are you sure you want to delete this chat?')) return;
+    // Show warning and proceed with delete (no browser confirm)
+    toast.warning('Deleting chat...', {
+      description: 'This action cannot be undone.',
+      duration: 3000,
+    });
     
     try {
       await deleteChatMutation.mutateAsync(chatId);
@@ -147,7 +143,6 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
               fullWidth
               leftIcon={<Plus className="w-4 h-4" />}
               onClick={handleNewChat}
-              isLoading={createChatMutation.isPending}
             >
               New Chat
             </Button>
@@ -235,6 +230,12 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
           </div>
         </div>
       </aside>
+
+      {/* Chat Name Dialog */}
+      <ChatNameDialog 
+        open={isChatDialogOpen} 
+        onOpenChange={setIsChatDialogOpen} 
+      />
     </>
   );
 }

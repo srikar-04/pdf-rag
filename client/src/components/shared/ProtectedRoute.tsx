@@ -85,3 +85,46 @@ export function PublicOnlyRoute({ children }: ProtectedRouteProps) {
   // Render children if not authenticated
   return <>{children}</>;
 }
+
+/**
+ * OnboardingRoute Component
+ * 
+ * Purpose:
+ * - Redirect to onboarding if required
+ * - Allow access if onboarding is not required
+ * 
+ * Usage:
+ * <Route element={<OnboardingRoute />}>
+ *   <Route path="/onboarding" element={<Onboarding />} />
+ * </Route>
+ */
+
+export function OnboardingRoute({ children }: ProtectedRouteProps) {
+  const { isAuthenticated, onBoardingRequired, isLoading } = useAuthStore();
+  const location = useLocation();
+  
+  // Show loading spinner while checking session
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a]">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+          <p className="text-white/60 text-sm">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // If not authenticated, redirect to signin
+  if (!isAuthenticated) {
+    return <Navigate to="/auth/signin" state={{ from: location }} replace />;
+  }
+  
+  // If onboarding is required, redirect to onboarding page
+  if (onBoardingRequired) {
+    return <Navigate to="/auth/onboarding" replace />;
+  }
+  
+  // Render children if authenticated and onboarding not required
+  return <>{children}</>;
+}

@@ -1,2 +1,2 @@
-export { ProtectedRoute, PublicOnlyRoute } from './ProtectedRoute';
+export { ProtectedRoute, PublicOnlyRoute, OnboardingRoute } from './ProtectedRoute';
 export { ErrorBoundary } from './ErrorBoundary';
