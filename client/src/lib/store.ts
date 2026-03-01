@@ -85,15 +85,20 @@ export const useAuthStore = create<AuthState>()(
       
       /**
        * Logout user
-       * Calls backend logout and clears state
+       * OAuth handles logout automatically - we just clear local state
+       * Redirect to OAuth signout endpoint to clear session cookie
        */
       logout: async () => {
         try {
-          await apiEndpoints.auth.logout();
+          // Clear auth state first
+          get().clearAuth();
+          
+          // Redirect to OAuth signout to clear session cookie
+          // Auth.js creates /auth/signout route automatically
+          window.location.href = '/auth/signout';
         } catch (error) {
           console.error('Logout error:', error);
-        } finally {
-          // Clear auth state regardless of API success
+          // Still clear auth state even if redirect fails
           get().clearAuth();
         }
       },

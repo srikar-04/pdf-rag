@@ -152,19 +152,18 @@ api.interceptors.response.use(
  * API Endpoints
  * 
  * Organized by feature for easy imports
- * NOTE: Some endpoints may differ from ideal REST design due to backend constraints
+ * NOTE: Logout is handled by OAuth (Auth.js) automatically
  */
 export const apiEndpoints = {
-  // Auth
+  // Auth - Session only (logout handled by OAuth)
   auth: {
     session: () => api.get('/auth/session'),
-    logout: () => api.post('/auth/logout'),
   },
   
   // Chats
   chats: {
     list: () => api.get('/chat'),
-    create: (data: { title: string }) => api.post('/chat/create-chat', data),
+    create: (data: { title: string }) => api.post('/chat/create-chat', { chatName: data.title }),
     get: (chatId: string) => api.get(`/chat/${chatId}`),
     delete: (chatId: string) => api.delete(`/chat/${chatId}`),
   },
@@ -173,7 +172,7 @@ export const apiEndpoints = {
   messages: {
     list: (chatId: string) => api.get(`/chat/${chatId}/messages`),
     send: (chatId: string, documentId: string, query: string) =>
-      api.get(`/message/query/${chatId}/${documentId}`, { params: { query } }),
+      api.post(`/message/query/${chatId}/${documentId}`, { content: query }),
   },
   
   // Documents
