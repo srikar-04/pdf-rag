@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
 import { useAuthStore } from './lib/store';
-import { PublicOnlyRoute, OnboardingRoute, ErrorBoundary } from './components/shared';
+import { PublicOnlyRoute, OnboardingRoute, ErrorBoundary, ProtectedRoute } from './components/shared';
 import { MainLayout } from './components/layout';
 
 // Lazy load pages for code splitting
@@ -102,14 +102,16 @@ function App() {
                   PROTECTED ROUTES
                   (Require authentication)
               =============================== */}
-              <Route element={<MainLayout />}>
-                <Route path="/dashboard" element={<Dashboard />} />
-                
-                {/* Chat Interface */}
-                <Route path="/chat/:chatId" element={<ChatPage />} />
-                
-                {/* Documents Library */}
-                <Route path="/documents" element={<DocumentsPage />} />
+              <Route element={<ProtectedRoute />}>
+                <Route element={<MainLayout />}>
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  
+                  {/* Chat Interface */}
+                  <Route path="/chat/:chatId" element={<ChatPage />} />
+                  
+                  {/* Documents Library */}
+                  <Route path="/documents" element={<DocumentsPage />} />
+                </Route>
               </Route>
 
               {/* ===============================

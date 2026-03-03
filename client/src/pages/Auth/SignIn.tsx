@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button } from '../../components/ui';
 import { Github, Chrome } from 'lucide-react';
+import { toast } from 'sonner';
 
 /**
  * SignIn Page
@@ -12,16 +13,65 @@ import { Github, Chrome } from 'lucide-react';
  * - Error handling
  */
 
+// Get backend URL from environment
+const getBackendUrl = () => {
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+  return apiUrl.replace('/api/v1', '');
+};
+
+interface CsrfResponse {
+  csrfToken?: string;
+}
+
 export default function SignIn() {
   const [isLoading, setIsLoading] = useState(false);
-  const [provider, setProvider] = useState<'github' | 'google' | null>(null);
+  const [loadingProvider, setLoadingProvider] = useState<'github' | 'google' | null>(null);
 
-  const handleSignIn = (selectedProvider: 'github' | 'google') => {
+  const handleSignIn = async (provider: 'github' | 'google') => {
     setIsLoading(true);
-    setProvider(selectedProvider);
-    
-    // Redirect to backend OAuth endpoint
-    window.location.href = `http://localhost:3000/auth/signin?provider=${selectedProvider}&callbackUrl=http://localhost:5173/dashboard`;
+    setLoadingProvider(provider);
+
+    try {
+      const backendUrl = getBackendUrl();
+      const csrfResponse = await fetch(`${backendUrl}/auth/csrf`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+
+      if (!csrfResponse.ok) {
+        throw new Error(`Failed to fetch CSRF token: ${csrfResponse.status}`);
+      }
+
+      const csrfData = (await csrfResponse.json()) as CsrfResponse;
+      if (!csrfData.csrfToken) {
+        throw new Error('CSRF token missing in response');
+      }
+
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = `${backendUrl}/auth/signin/${provider}`;
+      form.style.display = 'none';
+
+      const csrfInput = document.createElement('input');
+      csrfInput.type = 'hidden';
+      csrfInput.name = 'csrfToken';
+      csrfInput.value = csrfData.csrfToken;
+      form.appendChild(csrfInput);
+
+      const callbackInput = document.createElement('input');
+      callbackInput.type = 'hidden';
+      callbackInput.name = 'callbackUrl';
+      callbackInput.value = `${window.location.origin}/dashboard`;
+      form.appendChild(callbackInput);
+
+      document.body.appendChild(form);
+      form.submit();
+    } catch (error) {
+      console.error('Sign-in failed:', error);
+      toast.error('Unable to start sign in. Please try again.');
+      setIsLoading(false);
+      setLoadingProvider(null);
+    }
   };
 
   return (
@@ -52,7 +102,7 @@ export default function SignIn() {
               size="lg"
               fullWidth
               leftIcon={<Github className="w-5 h-5" />}
-              isLoading={isLoading && provider === 'github'}
+              isLoading={isLoading && loadingProvider === 'github'}
               onClick={() => handleSignIn('github')}
               className="h-12"
             >
@@ -64,7 +114,7 @@ export default function SignIn() {
               size="lg"
               fullWidth
               leftIcon={<Chrome className="w-5 h-5" />}
-              isLoading={isLoading && provider === 'google'}
+              isLoading={isLoading && loadingProvider === 'google'}
               onClick={() => handleSignIn('google')}
               className="h-12"
             >

@@ -1,4 +1,4 @@
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuthStore } from '../../lib/store';
 import { Loader2 } from 'lucide-react';
 
@@ -44,7 +44,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   }
   
   // Render children if authenticated
-  return <>{children}</>;
+  return children ? <>{children}</> : <Outlet />;
 }
 
 /**
@@ -83,7 +83,8 @@ export function PublicOnlyRoute({ children }: ProtectedRouteProps) {
   }
   
   // Render children if not authenticated
-  return <>{children}</>;
+  console.log('returning childern, user is not authenticated: in ProtectedRoute.tsx file')
+  return children ? <>{children}</> : <Outlet />;
 }
 
 /**
@@ -126,5 +127,6 @@ export function OnboardingRoute({ children }: ProtectedRouteProps) {
   }
   
   // Render children if authenticated and onboarding not required
-  return <>{children}</>;
+  console.log('returning childer, on boarding not required, already onboarded: in ProtectedRoute.tsx file')
+  return children ? <>{children}</> : <Outlet />;
 }
