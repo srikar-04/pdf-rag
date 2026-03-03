@@ -19,6 +19,7 @@ const envSchema = z.object({
   EMBEDDING_TIMEOUT_MS: z.string().default('60000').transform(Number),
    
   CORS_ORIGIN: z.url('CORS_ORIGIN must be a valid URL'),
+  FRONTEND_URL: z.url('FRONTEND_URL must be a valid URL').optional(),
   
   RATE_LIMIT_WINDOW_MS: z.string().default('60000').transform(Number), 
   RATE_LIMIT_MAX_REQUESTS: z.string().default('100').transform(Number),

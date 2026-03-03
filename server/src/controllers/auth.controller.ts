@@ -9,53 +9,44 @@ import { prisma } from "../lib/prisma.js";
 
 
 const getUserSession = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    let session;
     try {
-        const session = await getSession(req, authConfig)
-
-        if (!session || !session.user) {
-            throw new ApiError(401, 'Unauthorized')
-        }
-
-        // 1) get user details from session
-
-        const rawUser = {
-            // username: session.user.name, /* username is not included because it may not be unique */
-
-            email: session.user.email,
-            provider: session.provider,
-            providerUserId: session.providerUserId
-        }
-
-        // 2) validate "userAuth" details with zod schema
-        const parsedAuthUser = OAuthUserSchema.safeParse(rawUser)
-
-        if (!parsedAuthUser.success) {
-            const errorMessages = parsedAuthUser.error.issues.map(issue => issue.message)
-            throw new ApiError(401, 'OAuth user failed validation', errorMessages)
-        }
-
-        // 3) chekck if the user is already present in database
-        const existingUser = await prisma.user.findUnique({
-            where: {
-                provider_providerUserId: {
-                    provider: parsedAuthUser.data.provider,
-                    providerUserId: parsedAuthUser.data.providerUserId
-                }
-            }
-        })
-
-        if (existingUser) {
-            return res.json(new ApiResponse(200, { user: existingUser, onBoardingRequired: false }, "session retrieved, onboarding not required"))
-        }
-
-        return res.json(new ApiResponse(200, { user: session.user, onBoardingRequired: true }, "session retrieved, onboarding required"))
-
-        // 4) upserting user is done in another route and in below controller
-
-    } catch (error) {
-        console.log('error in getting session: ', error)
-        throw new ApiError(500, 'Internal server error in getting session')
+        session = await getSession(req, authConfig)
+    } catch (sessionError) {
+        console.error('Error getting session:', sessionError);
+        return res.json(new ApiResponse(200, { user: null, onBoardingRequired: false }, "no session"))
     }
+
+    if (!session || !session.user) {
+        return res.json(new ApiResponse(200, { user: null, onBoardingRequired: false }, "no session"))
+    }
+
+    const rawUser = {
+        email: session.user.email,
+        provider: session.provider,
+        providerUserId: session.providerUserId
+    }
+
+    const parsedAuthUser = OAuthUserSchema.safeParse(rawUser)
+
+    if (!parsedAuthUser.success) {
+        return res.json(new ApiResponse(200, { user: null, onBoardingRequired: false }, "invalid session"))
+    }
+
+    const existingUser = await prisma.user.findUnique({
+        where: {
+            provider_providerUserId: {
+                provider: parsedAuthUser.data.provider,
+                providerUserId: parsedAuthUser.data.providerUserId
+            }
+        }
+    })
+
+    if (existingUser) {
+        return res.json(new ApiResponse(200, { user: existingUser, onBoardingRequired: false }, "session retrieved"))
+    }
+
+    return res.json(new ApiResponse(200, { user: null, onBoardingRequired: true }, "needs onboarding"))
 })
 
 const registerUser = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {

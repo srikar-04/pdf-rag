@@ -8,6 +8,8 @@ const githubClientSecret = process.env.AUTH_GITHUB_SECRET
 const googleClientId = process.env.AUTH_GOOGLE_ID
 const googleClientSecret = process.env.AUTH_GOOGLE_SECRET
 
+const authSecret = process.env.AUTH_SECRET
+
 if (!githubClientId || !githubClientSecret) {
     throw new Error('AUTH_GITHUB_ID or AUTH_GITHUB_SECRET is not defined')
 }
@@ -16,13 +18,18 @@ if (!googleClientId || !googleClientSecret) {
     throw new Error('AUTH_GOOGLE_ID or AUTH_GOOGLE_SECRET is not defined')
 }
 
+if (!authSecret) {
+    throw new Error('AUTH_SECRET is not defined')
+}
+
 export const authConfig: ExpressAuthConfig = {
     providers: [
         GitHub({ clientId: githubClientId, clientSecret: githubClientSecret }),
         Google({ clientId: googleClientId, clientSecret: googleClientSecret })
     ],
-    basePath: '/auth',
+    secret: authSecret,
     trustHost: true,
+    basePath: '/auth',
     callbacks: {
         async signIn({ user, account, credentials, profile, email }) {
             console.log(user.id, user.name, user.email, user.image)
@@ -30,7 +37,14 @@ export const authConfig: ExpressAuthConfig = {
             return true
         },
         async redirect({ url, baseUrl }: { url: string, baseUrl: string }) {
-            return "http://localhost:5173"
+            // Allow callback URLs to pass through to Auth.js
+            if (url.includes('/auth/callback/')) {
+                return url;
+            }
+            // After successful OAuth, redirect to frontend
+            const redirectUrl = process.env.FRONTEND_URL || process.env.CORS_ORIGIN || baseUrl;
+            console.log('OAuth redirect to:', redirectUrl);
+            return redirectUrl;
         },
         async jwt({ token, user, account }) {
             if (user) {

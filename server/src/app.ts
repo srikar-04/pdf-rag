@@ -28,6 +28,7 @@ app.use(helmet({
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", "'unsafe-inline'"],
+      formAction: ["'self'", "http://localhost:3000"],
     },
   },
   hsts: {
@@ -54,6 +55,9 @@ app.use(urlencoded({ extended: true, limit: '10kb' }))
 
 app.set("trust proxy", true)
 app.use("/auth", ExpressAuth(authConfig))
+
+// Favicon - return 204 No Content to avoid 404
+app.get('/favicon.ico', (req, res) => res.status(204).end())
 
 
 // HEALTH CHECKS (before rate limiting)
