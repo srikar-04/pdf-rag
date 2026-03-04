@@ -12,6 +12,48 @@ import type { Role } from "../generated/prisma/enums.js";
 
 
 // type MessagesType = ChatCompletionMessageParam[] extends {role: Role, content: any}
+const LLM_MODEL = "models/gemini-2.5-flash";
+const LLM_MAX_OUTPUT_TOKENS = 1600;
+const MAX_CONTINUATION_ATTEMPTS = 2;
+
+const CONTINUATION_PROMPT =
+    "Continue exactly from where you stopped. Do not repeat earlier sections. Keep the same structure and complete the remaining explanation.";
+
+const isLengthStop = (reason: string | null | undefined): boolean =>
+    reason === "length" || reason === "max_tokens";
+
+const extractTextContent = (content: unknown): string => {
+    if (typeof content === "string") return content;
+    if (!Array.isArray(content)) return "";
+
+    return content
+        .map((part) => {
+            if (typeof part === "string") return part;
+            if (part && typeof part === "object" && "text" in part) {
+                return String((part as { text?: unknown }).text ?? "");
+            }
+            return "";
+        })
+        .join("")
+        .trim();
+};
+
+const callAssistant = async (messages: ChatCompletionMessageParam[]) => {
+    const response = await geminiClient.chat.completions.create({
+        model: LLM_MODEL,
+        messages,
+        temperature: 0.4,
+        max_tokens: LLM_MAX_OUTPUT_TOKENS,
+    });
+
+    const choice = response.choices?.[0];
+    return {
+        choice,
+        content: extractTextContent(choice?.message?.content),
+        finishReason: choice?.finish_reason,
+        usage: response.usage,
+    };
+};
 
 export const query = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
 
@@ -141,17 +183,48 @@ export const query = asyncHandler(async (req: Request, res: Response, next: Next
         }
     ]
 
-    const response = await geminiClient.chat.completions.create({
-        model: "models/gemini-2.5-flash",
-        messages,
-        reasoning_effort: "medium",
-        temperature: 0.4,
-        max_completion_tokens: 800
-    })
+    const firstResult = await callAssistant(messages);
 
-    if (!response) throw new ApiError(400, 'failed to get llm response')
+    if (!firstResult.choice) throw new ApiError(400, 'failed to get llm response')
 
-    let result = response.choices[0]?.message
+    console.log(
+        `[LLM] first pass finish_reason=${firstResult.finishReason ?? "unknown"} prompt_tokens=${firstResult.usage?.prompt_tokens ?? "n/a"} completion_tokens=${firstResult.usage?.completion_tokens ?? "n/a"}`
+    );
+
+    let resultContent = firstResult.content;
+    let finishReason = firstResult.finishReason;
+    let continuationAttempt = 0;
+
+    while (isLengthStop(finishReason) && continuationAttempt < MAX_CONTINUATION_ATTEMPTS) {
+        continuationAttempt += 1;
+
+        const continuationMessages: ChatCompletionMessageParam[] = [
+            ...messages,
+            { role: "assistant", content: resultContent },
+            { role: "user", content: CONTINUATION_PROMPT }
+        ];
+
+        const continuationResult = await callAssistant(continuationMessages);
+        const nextChunk = continuationResult.content;
+        if (!nextChunk) {
+            console.warn(`[LLM] continuation attempt ${continuationAttempt} returned empty content`);
+            break;
+        }
+
+        resultContent = `${resultContent}\n\n${nextChunk}`.trim();
+        finishReason = continuationResult.finishReason;
+
+        console.log(
+            `[LLM] continuation #${continuationAttempt} finish_reason=${finishReason ?? "unknown"} completion_tokens=${continuationResult.usage?.completion_tokens ?? "n/a"}`
+        );
+    }
+
+    if (!resultContent) throw new ApiError(400, 'model returned empty response');
+
+    const result = {
+        role: "assistant",
+        content: resultContent
+    };
 
 
     // appending the result to database
@@ -159,7 +232,7 @@ export const query = asyncHandler(async (req: Request, res: Response, next: Next
     await prisma.message.create({
         data: {
             role: "assistant",
-            content: result?.content as string,
+            content: result.content,
             chatId: chatId
         }
     })
