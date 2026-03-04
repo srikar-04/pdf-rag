@@ -169,6 +169,26 @@ export const useDocuments = (options?: UseQueryOptions<Document[], Error>) => {
 };
 
 /**
+ * Hook: useAvailableChatsForDocument
+ * Fetch chats where given document is not linked yet
+ */
+export const useAvailableChatsForDocument = (
+  documentId: string,
+  options?: Omit<UseQueryOptions<Chat[], Error>, 'queryKey' | 'queryFn'>
+) => {
+  return useQuery<Chat[], Error>({
+    queryKey: ['document-available-chats', documentId],
+    queryFn: async () => {
+      const response = await apiEndpoints.documents.availableChats(documentId);
+      return response.data.data;
+    },
+    enabled: !!documentId,
+    staleTime: 30 * 1000,
+    ...options,
+  });
+};
+
+/**
  * Hook: useDocumentStatus
  * Poll document processing status
  * Automatically stops polling when document is ready or failed
@@ -241,6 +261,61 @@ export const useUploadDocument = (
     onSuccess: () => {
       // Invalidate documents list
       queryClient.invalidateQueries({ queryKey: ['documents'] });
+    },
+    ...options,
+  });
+};
+
+/**
+ * Hook: useLinkDocumentToChat
+ * Link a document to an existing chat
+ */
+export const useLinkDocumentToChat = (
+  options?: UseMutationOptions<
+    Chat,
+    Error,
+    { documentId: string; chatId: string }
+  >
+) => {
+  const queryClient = useQueryClient();
+
+  return useMutation<Chat, Error, { documentId: string; chatId: string }>({
+    mutationFn: async ({ documentId, chatId }) => {
+      const response = await apiEndpoints.documents.linkToChat(documentId, chatId);
+      return response.data.data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['chats'] });
+      queryClient.invalidateQueries({ queryKey: ['chat', variables.chatId] });
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+      queryClient.invalidateQueries({ queryKey: ['document-available-chats', variables.documentId] });
+    },
+    ...options,
+  });
+};
+
+/**
+ * Hook: useCreateChatWithDocument
+ * Create a new chat and link selected document
+ */
+export const useCreateChatWithDocument = (
+  options?: UseMutationOptions<
+    Chat,
+    Error,
+    { documentId: string; chatName: string }
+  >
+) => {
+  const queryClient = useQueryClient();
+
+  return useMutation<Chat, Error, { documentId: string; chatName: string }>({
+    mutationFn: async ({ documentId, chatName }) => {
+      const response = await apiEndpoints.documents.linkToNewChat(documentId, chatName);
+      return response.data.data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['chats'] });
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+      queryClient.invalidateQueries({ queryKey: ['document-available-chats', variables.documentId] });
     },
     ...options,
   });

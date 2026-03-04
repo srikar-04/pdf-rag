@@ -9,6 +9,7 @@ import type { Document } from "../generated/prisma/client.js";
 import ApiResponse from "../utils/apiResponse.js";
 import { prisma } from "../lib/prisma.js";
 import { documentIngestionService } from "../services/documentIngestion.service.js";
+import { ChatCreateSchema } from "../schemas/chat.schema.js";
 
 const SCANNED_PDF_FAILURE_REASON =
     "No extractable text was found. This looks like a scanned/image-only PDF. OCR is not supported yet, so please upload a text-based PDF.";
@@ -345,12 +346,248 @@ export const deleteDocument = asyncHandler(async (req: Request, res: Response, n
         throw new ApiError(404, "Document not found or unauthorized");
     }
 
-    // Delete document (will cascade delete chunks, metadata, and ChatDocument relations)
-    await prisma.document.delete({
-        where: {
-            id: documentId,
-        },
+    const linkedChats = await prisma.chatDocument.findMany({
+        where: { documentId },
+        select: { chatId: true },
     });
+
+    const linkedChatIds = [...new Set(linkedChats.map((entry) => entry.chatId))];
+
+    await prisma.$transaction(async (tx) => {
+        // Remove relations first to avoid FK violations.
+        await tx.chatDocument.deleteMany({
+            where: { documentId },
+        });
+
+        // Cleanup child records explicitly for reliability.
+        await tx.chunkHash.deleteMany({
+            where: { documentId },
+        });
+
+        await tx.documentMetadata.deleteMany({
+            where: { documentId },
+        });
+
+        await tx.document.delete({
+            where: {
+                id: documentId,
+            },
+        });
+    });
+
+    // If any linked chat has no more docs, mark it empty.
+    await Promise.all(
+        linkedChatIds.map(async (chatId) => {
+            const remainingDocuments = await prisma.chatDocument.count({
+                where: { chatId },
+            });
+
+            if (remainingDocuments === 0) {
+                await prisma.chat.update({
+                    where: { id: chatId },
+                    data: { chatStatus: "empty" },
+                });
+            }
+        })
+    );
 
     res.json(new ApiResponse(200, {}, "Document deleted successfully"));
 })
+
+/**
+ * Get Chats Where Document Can Be Linked
+ * Returns user chats excluding chats already linked with this document.
+ */
+export const getAvailableChatsForDocument = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+    const { documentId } = req.params;
+
+    if (!userId) {
+        throw new ApiError(401, "Unauthorized, userId not found");
+    }
+
+    if (!documentId || Array.isArray(documentId)) {
+        throw new ApiError(400, "Valid Document ID is required");
+    }
+
+    const document = await prisma.document.findFirst({
+        where: {
+            id: documentId,
+            userId,
+        },
+        select: {
+            id: true,
+        },
+    });
+
+    if (!document) {
+        throw new ApiError(404, "Document not found or unauthorized");
+    }
+
+    const linkedRelations = await prisma.chatDocument.findMany({
+        where: { documentId },
+        select: { chatId: true },
+    });
+
+    const linkedChatIds = linkedRelations.map((entry) => entry.chatId);
+
+    const chats = await prisma.chat.findMany({
+        where: {
+            userId,
+            ...(linkedChatIds.length > 0 ? { id: { notIn: linkedChatIds } } : {}),
+        },
+        orderBy: {
+            updatedAt: "desc",
+        },
+        select: {
+            id: true,
+            title: true,
+            chatStatus: true,
+            createdAt: true,
+            updatedAt: true,
+        },
+    });
+
+    res.json(new ApiResponse(200, chats, "Available chats fetched successfully"));
+});
+
+/**
+ * Link Document To Existing Chat
+ */
+export const linkDocumentToChat = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+    const { documentId } = req.params;
+    const { chatId } = req.body as { chatId?: string };
+
+    if (!userId) {
+        throw new ApiError(401, "Unauthorized, userId not found");
+    }
+
+    if (!documentId || Array.isArray(documentId)) {
+        throw new ApiError(400, "Valid Document ID is required");
+    }
+
+    if (!chatId || typeof chatId !== "string") {
+        throw new ApiError(400, "Valid Chat ID is required");
+    }
+
+    const [document, chat] = await Promise.all([
+        prisma.document.findFirst({
+            where: { id: documentId, userId },
+            select: { id: true },
+        }),
+        prisma.chat.findFirst({
+            where: { id: chatId, userId },
+            select: { id: true, title: true, chatStatus: true, createdAt: true, updatedAt: true },
+        }),
+    ]);
+
+    if (!document) {
+        throw new ApiError(404, "Document not found or unauthorized");
+    }
+
+    if (!chat) {
+        throw new ApiError(404, "Chat not found or unauthorized");
+    }
+
+    const existingRelation = await prisma.chatDocument.findUnique({
+        where: {
+            chatId_documentId: {
+                chatId,
+                documentId,
+            },
+        },
+    });
+
+    if (existingRelation) {
+        throw new ApiError(409, "Document already linked to this chat");
+    }
+
+    await prisma.$transaction(async (tx) => {
+        await tx.chatDocument.create({
+            data: {
+                chatId,
+                documentId,
+            },
+        });
+
+        await tx.chat.update({
+            where: { id: chatId },
+            data: { chatStatus: "active" },
+        });
+    });
+
+    const updatedChat = await prisma.chat.findUnique({
+        where: { id: chatId },
+        select: {
+            id: true,
+            title: true,
+            chatStatus: true,
+            createdAt: true,
+            updatedAt: true,
+        },
+    });
+
+    res.json(new ApiResponse(200, updatedChat, "Document linked to chat successfully"));
+});
+
+/**
+ * Create New Chat And Link Document
+ */
+export const createChatAndLinkDocument = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+    const { documentId } = req.params;
+    const { chatName } = req.body as { chatName?: string };
+
+    if (!userId) {
+        throw new ApiError(401, "Unauthorized, userId not found");
+    }
+
+    if (!documentId || Array.isArray(documentId)) {
+        throw new ApiError(400, "Valid Document ID is required");
+    }
+
+    const parsedChatName = ChatCreateSchema.safeParse({
+        title: chatName,
+    });
+
+    if (!parsedChatName.success) {
+        const errorMessages = parsedChatName.error.issues.map((issue) => issue.message);
+        throw new ApiError(400, "Chat name validation failed", errorMessages);
+    }
+
+    const document = await prisma.document.findFirst({
+        where: { id: documentId, userId },
+        select: { id: true },
+    });
+
+    if (!document) {
+        throw new ApiError(404, "Document not found or unauthorized");
+    }
+
+    const newChat = await prisma.chat.create({
+        data: {
+            title: parsedChatName.data.title,
+            userId,
+            chatStatus: "active",
+            documents: {
+                create: {
+                    document: {
+                        connect: {
+                            id: documentId,
+                        },
+                    },
+                },
+            },
+        },
+        select: {
+            id: true,
+            title: true,
+            chatStatus: true,
+            createdAt: true,
+            updatedAt: true,
+        },
+    });
+
+    res.json(new ApiResponse(200, newChat, "New chat created and document linked successfully"));
+});

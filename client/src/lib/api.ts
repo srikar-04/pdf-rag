@@ -201,6 +201,11 @@ export const apiEndpoints = {
   // Documents
   documents: {
     list: () => api.get('/document'),
+    availableChats: (documentId: string) => api.get(`/document/${documentId}/available-chats`),
+    linkToChat: (documentId: string, chatId: string) =>
+      api.post(`/document/${documentId}/link-chat`, { chatId }),
+    linkToNewChat: (documentId: string, chatName: string) =>
+      api.post(`/document/${documentId}/link-new-chat`, { chatName }),
     upload: (chatId: string, file: File) => {
       const formData = new FormData();
       formData.append('file', file);

@@ -33,6 +33,7 @@ export default function ChatPage() {
   const [showUpload, setShowUpload] = useState(false);
   const [uploadFailureNotice, setUploadFailureNotice] = useState<string | null>(null);
   const hasShownFailureToastRef = useRef(false);
+  const wasDocumentReadyRef = useRef(false);
   const queryClient = useQueryClient();
 
   // React Query hooks
@@ -51,9 +52,11 @@ export default function ChatPage() {
   const isDocumentReady = effectiveDocumentStatus === 'ready';
 
   useEffect(() => {
-    if (isDocumentReady && showUpload) {
+    // Auto-close upload panel only on transition to ready (not on manual re-open later).
+    if (!wasDocumentReadyRef.current && isDocumentReady && showUpload) {
       setShowUpload(false);
     }
+    wasDocumentReadyRef.current = isDocumentReady;
   }, [isDocumentReady, showUpload]);
 
   useEffect(() => {
