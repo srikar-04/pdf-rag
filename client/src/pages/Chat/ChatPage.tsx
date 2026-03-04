@@ -45,6 +45,7 @@ export default function ChatPage() {
 
   const effectiveDocumentStatus = polledDocumentStatus?.documentStatus || selectedDocument?.documentStatus;
   const effectiveIngestionStep = (polledDocumentStatus?.ingestionStep || selectedDocument?.ingestionStep || 'none') as IngestionStep;
+  const failureReason = polledDocumentStatus?.failureReason;
   const isDocumentReady = effectiveDocumentStatus === 'ready';
 
   useEffect(() => {
@@ -249,9 +250,15 @@ export default function ChatPage() {
                 );
               })}
             </div>
-            <p className="text-[11px] text-amber-200/80 mt-2">
-              Messaging will be enabled automatically when this reaches the final step.
-            </p>
+            {effectiveDocumentStatus === 'failed' ? (
+              <p className="text-[11px] text-red-200/90 mt-2">
+                {failureReason || 'Document ingestion failed. Please upload a text-based PDF and try again.'}
+              </p>
+            ) : (
+              <p className="text-[11px] text-amber-200/80 mt-2">
+                Messaging will be enabled automatically when this reaches the final step.
+              </p>
+            )}
           </div>
         </div>
       )}

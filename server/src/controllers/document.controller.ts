@@ -10,6 +10,9 @@ import ApiResponse from "../utils/apiResponse.js";
 import { prisma } from "../lib/prisma.js";
 import { documentIngestionService } from "../services/documentIngestion.service.js";
 
+const SCANNED_PDF_FAILURE_REASON =
+    "No extractable text was found. This looks like a scanned/image-only PDF. OCR is not supported yet, so please upload a text-based PDF.";
+
 
 export const documentUpload = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
 
@@ -260,7 +263,21 @@ export const documentStatus = asyncHandler(async (req: Request, res: Response, n
         throw new ApiError(404, 'user id does not match in doc status handler')
     }
 
-    res.json(new ApiResponse(201, docDB, 'successfully fetched doc status details'))
+    const failureReason =
+        docDB.documentStatus === "failed" && docDB.ingestionStep === "fetched"
+            ? SCANNED_PDF_FAILURE_REASON
+            : undefined;
+
+    res.json(
+        new ApiResponse(
+            201,
+            {
+                ...docDB,
+                failureReason
+            },
+            'successfully fetched doc status details'
+        )
+    )
 
 })
 

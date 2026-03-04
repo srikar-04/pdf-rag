@@ -176,12 +176,12 @@ export const useDocuments = (options?: UseQueryOptions<Document[], Error>) => {
 export const useDocumentStatus = (
   documentId: string,
   options?: UseQueryOptions<
-    { documentStatus: DocumentStatus; ingestionStep: string },
+    { documentStatus: DocumentStatus; ingestionStep: string; failureReason?: string },
     Error
   >
 ) => {
   return useQuery<
-    { documentStatus: DocumentStatus; ingestionStep: string },
+    { documentStatus: DocumentStatus; ingestionStep: string; failureReason?: string },
     Error
   >({
     queryKey: ['document-status', documentId],

@@ -24,7 +24,7 @@ const documentIngestionService = async (docDetails: Document) => {
         // 1. pdf loading
         const pdfLoaderResponse = await pdfLoader(docDetails)
 
-        if (!(pdfLoaderResponse.data.result as TextResult).text && (pdfLoaderResponse.data.result as TextResult).text.length === 0) {
+        if (!(pdfLoaderResponse.data.result as TextResult).text?.trim()) {
             throw new IngestionError(IngestionStep.none, 'cannot get loaded pdf text')
         }
 
@@ -185,7 +185,16 @@ const documentIngestionService = async (docDetails: Document) => {
                     ingestionStep: error.ingestionStep
                 }
             })
+            return;
         }
+
+        await prisma.document.update({
+            where: { id: docDetails.id },
+            data: {
+                documentStatus: "failed",
+                ingestionStep: IngestionStep.none
+            }
+        })
     }
 
 }

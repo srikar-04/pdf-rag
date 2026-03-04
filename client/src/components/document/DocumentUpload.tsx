@@ -76,6 +76,9 @@ const isRetriableError = (error: any): boolean => {
   return status === 408 || status === 409 || status === 429 || status >= 500;
 };
 
+const isOcrUnsupportedMessage = (message?: string): boolean =>
+  /ocr|scanned|image-only|extractable text/i.test(message || '');
+
 export function DocumentUpload({ chatId, onUploadComplete }: DocumentUploadProps) {
   const queryClient = useQueryClient();
   const [uploadState, setUploadState] = useState<{
@@ -302,12 +305,16 @@ export function DocumentUpload({ chatId, onUploadComplete }: DocumentUploadProps
     }
 
     if (docStatus.documentStatus === 'failed' && uploadState.status !== 'error') {
+      const failureMessage =
+        docStatus.failureReason ||
+        'Document ingestion failed. Please upload a text-based PDF and try again.';
+
       setUploadState(prev => ({
         ...prev,
         status: 'error',
-        error: 'Document ingestion failed. Please retry.',
+        error: failureMessage,
       }));
-      toast.error('Document ingestion failed.');
+      toast.error(failureMessage);
     }
   }, [docStatus, onUploadComplete, uploadState.documentId, uploadState.status]);
 
@@ -468,17 +475,21 @@ export function DocumentUpload({ chatId, onUploadComplete }: DocumentUploadProps
                 {uploadState.error || 'Document processing failed.'}
               </p>
               <p className="text-xs text-white/50">
-                Retry ingestion to continue.
+                {isOcrUnsupportedMessage(uploadState.error)
+                  ? 'Please upload a text-based PDF. OCR for scanned PDFs is not available yet.'
+                  : 'Retry ingestion to continue.'}
               </p>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleRetryIngestion}
-              isLoading={ingestMutation.isPending}
-            >
-              Retry ingestion
-            </Button>
+            {!isOcrUnsupportedMessage(uploadState.error) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleRetryIngestion}
+                isLoading={ingestMutation.isPending}
+              >
+                Retry ingestion
+              </Button>
+            )}
           </div>
         </div>
       )}

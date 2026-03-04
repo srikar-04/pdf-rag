@@ -71,6 +71,30 @@ export const query = asyncHandler(async (req: Request, res: Response, next: Next
 
     if (!query) throw new ApiError(404, 'did not find user query')
 
+    const documentDB = await prisma.document.findUnique({
+        where: { id: documentId },
+        select: {
+            id: true,
+            userId: true,
+            documentStatus: true,
+        }
+    })
+
+    if (!documentDB) {
+        throw new ApiError(404, "Document not found")
+    }
+
+    if (documentDB.userId !== user.id) {
+        throw new ApiError(401, "Unauthorized document access")
+    }
+
+    if (documentDB.documentStatus !== "ready") {
+        throw new ApiError(
+            409,
+            "Document is not ready for querying. If this is a scanned/image-only PDF, OCR is not supported yet."
+        )
+    }
+
     const relation = await prisma.chatDocument.findUnique({
         where: {
             chatId_documentId: {
