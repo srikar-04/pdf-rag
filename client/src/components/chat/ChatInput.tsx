@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect, type KeyboardEvent } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Paperclip, Loader2 } from 'lucide-react';
+import { Send, Loader2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useDrafts } from '../../hooks/useDrafts';
 
@@ -27,7 +26,7 @@ import { useDrafts } from '../../hooks/useDrafts';
  */
 
 interface ChatInputProps {
-  onSend: (message: string) => void;
+  onSend: (message: string) => void | Promise<void>;
   isLoading?: boolean;
   disabled?: boolean;
   placeholder?: string;
@@ -42,6 +41,7 @@ export function ChatInput({
   chatId
 }: ChatInputProps) {
   const [message, setMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   
   // Auto-save drafts
@@ -62,16 +62,23 @@ export function ChatInput({
   }, [hasDraft, savedDraft]);
 
   // Handle send
-  const handleSend = () => {
-    if (!message.trim() || isLoading || disabled) return;
-    
-    onSend(message.trim());
-    setMessage('');
-    clearDraft();
-    
-    // Reset textarea height
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
+  const handleSend = async () => {
+    const trimmed = message.trim();
+    if (!trimmed || isLoading || disabled || isSubmitting) return;
+
+    setIsSubmitting(true);
+
+    try {
+      await Promise.resolve(onSend(trimmed));
+      setMessage('');
+      clearDraft();
+
+      // Reset textarea height
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -80,7 +87,7 @@ export function ChatInput({
     // Send on Enter (without Shift)
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSend();
+      void handleSend();
     }
   };
 
@@ -95,7 +102,8 @@ export function ChatInput({
     updateDraft(textarea?.value || '');
   };
 
-  const canSend = message.trim().length > 0 && !isLoading && !disabled;
+  const inputDisabled = disabled || isLoading || isSubmitting;
+  const canSend = message.trim().length > 0 && !inputDisabled;
 
   return (
     <div className="border-t border-white/5 bg-[#0a0a0a] px-4 py-4">
@@ -119,21 +127,8 @@ export function ChatInput({
         {/* Input Container */}
         <div className={cn(
           'relative flex items-end gap-2 rounded-xl border transition-colors',
-          disabled ? 'border-white/5 bg-white/5' : 'border-white/10 bg-white/5 focus-within:border-indigo-500/50 focus-within:bg-white/10'
+          inputDisabled ? 'border-white/5 bg-white/5' : 'border-white/10 bg-white/5 focus-within:border-indigo-500/50 focus-within:bg-white/10'
         )}>
-          {/* Attachment Button (disabled for now) */}
-          <button
-            disabled={disabled || isLoading}
-            className={cn(
-              'p-2.5 rounded-lg transition-colors flex-shrink-0',
-              'text-white/40 hover:text-white hover:bg-white/5',
-              'disabled:opacity-50 disabled:cursor-not-allowed'
-            )}
-            title="Attach document"
-          >
-            <Paperclip className="w-5 h-5" />
-          </button>
-
           {/* Textarea */}
           <textarea
             ref={textareaRef}
@@ -142,13 +137,13 @@ export function ChatInput({
             onKeyDown={handleKeyDown}
             onInput={handleInput}
             placeholder={placeholder}
-            disabled={disabled || isLoading}
+            disabled={inputDisabled}
             rows={1}
             className={cn(
               'flex-1 bg-transparent resize-none',
               'placeholder:text-white/30',
               'focus:outline-none text-sm text-white',
-              'py-3 max-h-[150px] overflow-y-auto',
+              'px-3 py-3 max-h-[150px] overflow-y-auto',
               'disabled:opacity-50'
             )}
           />
@@ -164,32 +159,23 @@ export function ChatInput({
           )}
 
           {/* Send Button */}
-          <AnimatePresence>
-            {canSend && (
-              <motion.div
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.8, opacity: 0 }}
-              >
-                <button
-                  onClick={handleSend}
-                  disabled={disabled || isLoading}
-                  className={cn(
-                    'p-2.5 rounded-lg transition-all shrink-0',
-                    'bg-indigo-500 hover:bg-indigo-600 text-white',
-                    'disabled:opacity-50 disabled:cursor-not-allowed',
-                    'hover:shadow-lg hover:shadow-indigo-500/25'
-                  )}
-                >
-                  {isLoading ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <Send className="w-5 h-5" />
-                  )}
-                </button>
-              </motion.div>
+          <button
+            onClick={() => void handleSend()}
+            disabled={!canSend}
+            className={cn(
+              'p-2.5 rounded-lg transition-all shrink-0 m-1',
+              canSend
+                ? 'bg-indigo-500 hover:bg-indigo-600 text-white hover:shadow-lg hover:shadow-indigo-500/25'
+                : 'bg-white/5 text-white/30 cursor-not-allowed'
             )}
-          </AnimatePresence>
+            title="Send message"
+          >
+            {isLoading || isSubmitting ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <Send className="w-5 h-5" />
+            )}
+          </button>
         </div>
 
         {/* Hint */}

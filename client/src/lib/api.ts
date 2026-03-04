@@ -78,11 +78,22 @@ api.interceptors.response.use(
       const status = error.response.status;
       const data = error.response.data as { message?: string; errors?: unknown[] };
       const message = data?.message || 'An error occurred';
+      const validationDetails = (Array.isArray(data?.errors) ? data.errors : [])
+        .map((entry) => {
+          if (typeof entry === 'string') return entry;
+          if (entry && typeof entry === 'object' && 'message' in entry) {
+            return String((entry as { message?: unknown }).message ?? '');
+          }
+          return '';
+        })
+        .filter(Boolean);
       
       switch (status) {
         case 400:
           // Bad Request - validation errors
-          toast.error(message);
+          toast.error(message, {
+            description: validationDetails[0],
+          });
           break;
           
         case 401:
@@ -120,7 +131,9 @@ api.interceptors.response.use(
           break;
           
         default:
-          toast.error(message);
+          toast.error(message, {
+            description: validationDetails[0],
+          });
       }
       
       // Log error details in development
@@ -135,7 +148,11 @@ api.interceptors.response.use(
       
     } else if (error.request) {
       // Request made but no response (network error)
-      toast.error('Network error. Please check your connection.');
+      if ((error as { code?: string }).code === 'ECONNABORTED') {
+        toast.error('Request timed out. Server is taking longer than expected.');
+      } else {
+        toast.error('Network error. Please check your connection.');
+      }
       console.error('[Network Error]', error.request);
       
     } else {
@@ -186,6 +203,7 @@ export const apiEndpoints = {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        timeout: 120000,
       });
     },
     status: (documentId: string) => api.get(`/document/status/${documentId}`),

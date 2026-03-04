@@ -62,20 +62,19 @@ export function UploadDropzone({
 
     const files = e.dataTransfer.files;
     if (files && files.length > 0) {
-      const file = files[0];
-      // Validate PDF
-      if (file.type === 'application/pdf') {
-        onFileSelect(file);
-      }
+      onFileSelect(files[0]);
     }
   }, [onFileSelect]);
 
   // Handle file input
   const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.currentTarget;
     const files = e.target.files;
     if (files && files.length > 0) {
       onFileSelect(files[0]);
     }
+    // Allow selecting the same file again after a failed attempt.
+    input.value = '';
   }, [onFileSelect]);
 
   // Don't show dropzone if already uploading successfully

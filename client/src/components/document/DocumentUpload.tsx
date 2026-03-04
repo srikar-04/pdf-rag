@@ -42,11 +42,33 @@ interface ResolvedDocument {
 }
 
 const INGESTION_RETRY_DELAYS_MS = [1000, 2000, 4000];
+const UPLOAD_RETRY_DELAYS_MS = [1500, 3000];
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const getErrorMessage = (error: any): string =>
-  error?.response?.data?.message || error?.message || 'Upload failed';
+const getErrorMessage = (error: any): string => {
+  const data = error?.response?.data as { message?: string; errors?: unknown[] } | undefined;
+  const rawErrors = Array.isArray(data?.errors) ? data.errors : [];
+  const parsedErrors = rawErrors
+    .map((entry) => {
+      if (typeof entry === 'string') return entry;
+      if (entry && typeof entry === 'object' && 'message' in entry) {
+        return String((entry as { message?: unknown }).message ?? '');
+      }
+      return '';
+    })
+    .filter(Boolean);
+
+  if (parsedErrors.length > 0) {
+    return parsedErrors.join(' ');
+  }
+
+  if (error?.code === 'ECONNABORTED') {
+    return 'Upload timed out before server completed processing. Please retry.';
+  }
+
+  return data?.message || error?.message || 'Upload failed';
+};
 
 const isRetriableError = (error: any): boolean => {
   if (!error?.response) return true;
@@ -131,6 +153,31 @@ export function DocumentUpload({ chatId, onUploadComplete }: DocumentUploadProps
       return false;
     },
     [ingestMutation]
+  );
+
+  const uploadWithRetry = useCallback(
+    async (file: File) => {
+      const totalAttempts = UPLOAD_RETRY_DELAYS_MS.length + 1;
+      let lastError: unknown = null;
+
+      for (let attempt = 1; attempt <= totalAttempts; attempt++) {
+        try {
+          return await uploadMutation.mutateAsync({ chatId, file });
+        } catch (error) {
+          lastError = error;
+          const canRetry = isRetriableError(error) && attempt < totalAttempts;
+          if (!canRetry) {
+            throw error;
+          }
+
+          toast.info(`Upload interrupted. Retrying (${attempt + 1}/${totalAttempts})...`);
+          await sleep(UPLOAD_RETRY_DELAYS_MS[attempt - 1]);
+        }
+      }
+
+      throw lastError;
+    },
+    [chatId, uploadMutation]
   );
 
   const syncQueriesAfterDocumentAttach = useCallback(async () => {
@@ -316,14 +363,14 @@ export function DocumentUpload({ chatId, onUploadComplete }: DocumentUploadProps
     }, 200);
 
     try {
-      const data = await uploadMutation.mutateAsync({ chatId, file });
+      const data = await uploadWithRetry(file);
       await handleUploadSuccess(data, file.name);
     } catch (error: any) {
       await handleUploadError(error, file.name);
     } finally {
       clearInterval(progressInterval);
     }
-  }, [chatId, uploadMutation, handleUploadSuccess, handleUploadError]);
+  }, [uploadWithRetry, handleUploadSuccess, handleUploadError]);
 
   // Handle reset (start new upload)
   const handleReset = () => {
