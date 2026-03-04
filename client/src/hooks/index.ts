@@ -6,7 +6,8 @@ import {
   type UseMutationOptions 
 } from '@tanstack/react-query';
 import { apiEndpoints } from '../lib/api';
-import type { Chat, Document, Message, DocumentStatus } from '../types';
+import { getDisplayDocumentName } from '../lib/utils';
+import type { Chat, Document, Message, DocumentStatus, DocumentUploadResponse } from '../types';
 
 /**
  * React Query Hooks
@@ -156,7 +157,11 @@ export const useDocuments = (options?: UseQueryOptions<Document[], Error>) => {
     queryKey: ['documents'],
     queryFn: async () => {
       const response = await apiEndpoints.documents.list();
-      return response.data.data;
+      const documents = response.data.data as Document[];
+      return documents.map((doc) => ({
+        ...doc,
+        displayName: getDisplayDocumentName(doc.documentName),
+      }));
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     ...options,
@@ -211,7 +216,7 @@ export const useDocumentStatus = (
  */
 export const useUploadDocument = (
   options?: UseMutationOptions<
-    { documentEntry: Document },
+    DocumentUploadResponse['data'],
     Error,
     { chatId: string; file: File }
   >
@@ -219,7 +224,7 @@ export const useUploadDocument = (
   const queryClient = useQueryClient();
   
   return useMutation<
-    { documentEntry: Document },
+    DocumentUploadResponse['data'],
     Error,
     { chatId: string; file: File }
   >({

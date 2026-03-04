@@ -262,7 +262,7 @@ export default function Dashboard() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-white truncate group-hover:text-purple-300">
-                        {doc.documentName}
+                        {doc.displayName || doc.documentName}
                       </p>
                       <p className="text-xs text-white/40 flex items-center gap-1">
                         <Clock className="w-3 h-3" />

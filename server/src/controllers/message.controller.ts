@@ -122,6 +122,11 @@ export const query = asyncHandler(async (req: Request, res: Response, next: Next
     Always explain the reasoning clearly.
     Structure your answer in paragraphs.
     If information is missing, explicitly state that the document does not provide it.
+
+    The relevant context of for the question is delemented in triple qoutes below. Read it carefully and answer user question with proper first principle reasoning 
+
+    """${retrievalResponse.context}"""
+
     `
 
     let messages: any = [

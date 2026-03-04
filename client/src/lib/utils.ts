@@ -32,3 +32,25 @@ export function truncateText(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text;
   return text.slice(0, maxLength) + '...';
 }
+
+/**
+ * Convert stored internal document name to user-facing name.
+ * Internal format: <userId>_<sha256>_<originalFileName>
+ */
+export function getDisplayDocumentName(documentName: string): string {
+  const parts = documentName.split('_');
+
+  if (parts.length < 3) return documentName;
+
+  const maybeUserId = parts[0];
+  const maybeHash = parts[1];
+  const isUuid =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      maybeUserId
+    );
+  const isSha256 = /^[0-9a-f]{64}$/i.test(maybeHash);
+
+  if (!isUuid || !isSha256) return documentName;
+
+  return parts.slice(2).join('_');
+}

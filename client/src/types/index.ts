@@ -46,6 +46,7 @@ export type IngestionStep = 'none' | 'fetched' | 'normalized' | 'chunked' | 'emb
 export interface Document {
   id: string;
   documentName: string;
+  displayName?: string;
   storagePath: string;
   userId: string;
   documentStatus: DocumentStatus;
@@ -69,10 +70,14 @@ export interface DocumentUploadResponse {
   success: boolean;
   data: {
     imageKitResponse?: {
-      url: string;
-      fileId: string;
+      url?: string;
+      fileId?: string;
+      id?: string;
+      documentName?: string;
+      documentStatus?: DocumentStatus;
+      ingestionStep?: IngestionStep;
     };
-    documentEntry: Document;
+    documentEntry?: Document;
     chatDocumentEntry?: {
       chatId: string;
       documentId: string;

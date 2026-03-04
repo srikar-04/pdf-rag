@@ -30,7 +30,7 @@ export default function DocumentsPage() {
 
   // Filter documents by search
   const filteredDocuments = documents?.filter(doc =>
-    doc.documentName.toLowerCase().includes(searchQuery.toLowerCase())
+    (doc.displayName || doc.documentName).toLowerCase().includes(searchQuery.toLowerCase())
   ) || [];
 
   // Handle document selection (create chat with document)
@@ -38,7 +38,7 @@ export default function DocumentsPage() {
     try {
       // Find the document name
       const doc = documents?.find(d => d.id === docId);
-      const docName = doc?.documentName.replace('.pdf', '') || 'New Chat';
+      const docName = (doc?.displayName || doc?.documentName || 'New Chat').replace('.pdf', '');
       
       // Create a new chat with this document
       const newChat = await createChatMutation.mutateAsync({

@@ -1,10 +1,13 @@
 import { useState, useCallback, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { UploadDropzone } from './UploadDropzone';
 import { useUploadDocument, useDocumentStatus, useIngestDocument } from '../../hooks';
+import { apiEndpoints } from '../../lib/api';
 import { Button } from '../ui';
 import { toast } from 'sonner';
 import { FileText } from 'lucide-react';
-import { cn } from '../../lib/utils';
+import { cn, getDisplayDocumentName } from '../../lib/utils';
+import type { DocumentStatus, IngestionStep, DocumentUploadResponse } from '../../types';
 
 /**
  * DocumentUpload Component
@@ -31,7 +34,28 @@ interface DocumentUploadProps {
   onUploadComplete?: (documentId: string) => void;
 }
 
+interface ResolvedDocument {
+  id: string;
+  documentName: string;
+  documentStatus?: DocumentStatus;
+  ingestionStep?: IngestionStep;
+}
+
+const INGESTION_RETRY_DELAYS_MS = [1000, 2000, 4000];
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const getErrorMessage = (error: any): string =>
+  error?.response?.data?.message || error?.message || 'Upload failed';
+
+const isRetriableError = (error: any): boolean => {
+  if (!error?.response) return true;
+  const status = error.response.status;
+  return status === 408 || status === 409 || status === 429 || status >= 500;
+};
+
 export function DocumentUpload({ chatId, onUploadComplete }: DocumentUploadProps) {
+  const queryClient = useQueryClient();
   const [uploadState, setUploadState] = useState<{
     status: 'idle' | 'uploading' | 'processing' | 'success' | 'error';
     progress: number;
@@ -53,52 +77,212 @@ export function DocumentUpload({ chatId, onUploadComplete }: DocumentUploadProps
     },
   });
 
-  // Handle upload success - call ingestion API
-  const handleUploadSuccess = async (data: { documentEntry: { id: string; documentName: string } }) => {
-    const docId = data.documentEntry.id;
-    
-    setUploadState({
-      status: 'processing',
-      progress: 100,
-      fileName: data.documentEntry.documentName,
-      documentId: docId,
-    });
-
-    // Call ingestion API to start processing pipeline
-    try {
-      await ingestMutation.mutateAsync(docId);
-    } catch (error) {
-      console.log('Ingestion call made, will poll for status');
+  const resolveUploadDocument = (
+    data: DocumentUploadResponse['data'],
+    fallbackFileName: string
+  ): ResolvedDocument | null => {
+    if (data.documentEntry?.id) {
+      return {
+        id: data.documentEntry.id,
+        documentName: data.documentEntry.documentName || fallbackFileName,
+        documentStatus: data.documentEntry.documentStatus,
+        ingestionStep: data.documentEntry.ingestionStep,
+      };
     }
+
+    if (data.imageKitResponse?.id) {
+      return {
+        id: data.imageKitResponse.id,
+        documentName: data.imageKitResponse.documentName || fallbackFileName,
+        documentStatus: data.imageKitResponse.documentStatus,
+        ingestionStep: data.imageKitResponse.ingestionStep,
+      };
+    }
+
+    if (data.chatDocumentEntry?.documentId) {
+      return {
+        id: data.chatDocumentEntry.documentId,
+        documentName: fallbackFileName,
+      };
+    }
+
+    return null;
   };
 
-  // Handle upload error
-  const handleUploadError = (error: Error) => {
-    setUploadState({
-      status: 'error',
-      progress: 0,
-      error: error.message || 'Upload failed',
-    });
-  };
+  const startIngestionWithRetry = useCallback(
+    async (documentId: string) => {
+      const totalAttempts = INGESTION_RETRY_DELAYS_MS.length + 1;
 
-  // Pass handlers to upload mutation
-  useEffect(() => {
-    // This is handled in handleFileSelect
-  }, []);
+      for (let attempt = 1; attempt <= totalAttempts; attempt++) {
+        try {
+          await ingestMutation.mutateAsync(documentId);
+          return true;
+        } catch (error) {
+          const canRetry = isRetriableError(error) && attempt < totalAttempts;
+          if (!canRetry) {
+            console.error(`Ingestion start failed after ${attempt} attempt(s):`, error);
+            return false;
+          }
+
+          await sleep(INGESTION_RETRY_DELAYS_MS[attempt - 1]);
+        }
+      }
+
+      return false;
+    },
+    [ingestMutation]
+  );
+
+  const syncQueriesAfterDocumentAttach = useCallback(async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['chat', chatId] }),
+      queryClient.invalidateQueries({ queryKey: ['documents'] }),
+    ]);
+  }, [chatId, queryClient]);
+
+  const continueProcessingDocument = useCallback(
+    async (document: ResolvedDocument) => {
+      setUploadState({
+        status: document.documentStatus === 'ready' ? 'success' : 'processing',
+        progress: 100,
+        fileName: document.documentName,
+        documentId: document.id,
+      });
+
+      await syncQueriesAfterDocumentAttach();
+
+      if (document.documentStatus === 'ready') {
+        toast.success('Document ready!');
+        onUploadComplete?.(document.id);
+        return;
+      }
+
+      const started = await startIngestionWithRetry(document.id);
+      if (!started) {
+        setUploadState((prev) => ({
+          ...prev,
+          status: 'error',
+          error: 'Could not start ingestion right now. Please retry.',
+        }));
+        toast.warning('Could not start ingestion right now. Please retry.');
+      }
+    },
+    [onUploadComplete, startIngestionWithRetry, syncQueriesAfterDocumentAttach]
+  );
+
+  const recoverDocumentFromChat = useCallback(
+    async (uploadedFileName: string): Promise<ResolvedDocument | null> => {
+      try {
+        const response = await apiEndpoints.chats.get(chatId);
+        const documents = response.data?.data?.documents || [];
+
+        const normalizedUploaded = uploadedFileName.toLowerCase();
+        const match = documents.find((doc: any) => {
+          const raw = String(doc.documentName || '').toLowerCase();
+          const display = getDisplayDocumentName(String(doc.documentName || '')).toLowerCase();
+          return (
+            raw === normalizedUploaded ||
+            display === normalizedUploaded ||
+            raw.endsWith(`_${normalizedUploaded}`)
+          );
+        });
+
+        if (!match) return null;
+
+        return {
+          id: match.id,
+          documentName: match.documentName,
+          documentStatus: match.documentStatus,
+          ingestionStep: match.ingestionStep,
+        };
+      } catch (error) {
+        console.error('Recovery check failed:', error);
+        return null;
+      }
+    },
+    [chatId]
+  );
+
+  const handleUploadSuccess = useCallback(
+    async (data: DocumentUploadResponse['data'], uploadedFileName: string) => {
+      const resolved = resolveUploadDocument(data, uploadedFileName);
+      if (!resolved) {
+        throw new Error('Upload response missing document reference');
+      }
+
+      await continueProcessingDocument(resolved);
+    },
+    [continueProcessingDocument]
+  );
+
+  const handleUploadError = useCallback(
+    async (error: any, uploadedFileName: string) => {
+      const message = getErrorMessage(error);
+      const isDuplicate = /document already exists/i.test(message);
+      const shouldTryRecovery = isDuplicate || isRetriableError(error);
+
+      if (shouldTryRecovery) {
+        const recovered = await recoverDocumentFromChat(uploadedFileName);
+        if (recovered) {
+          toast.info('Recovered existing upload. Resuming processing...');
+          await continueProcessingDocument(recovered);
+          return;
+        }
+      }
+
+      setUploadState({
+        status: 'error',
+        progress: 0,
+        error: message,
+      });
+    },
+    [continueProcessingDocument, recoverDocumentFromChat]
+  );
 
   // Poll document status while processing
   const { data: docStatus } = useDocumentStatus(uploadState.documentId || '');
 
-  // Check if document is ready
+  // Check ingestion lifecycle updates
   useEffect(() => {
-    if (docStatus?.documentStatus === 'ready') {
+    if (!docStatus) return;
+
+    if (docStatus.documentStatus === 'ready' && uploadState.status !== 'success') {
       setUploadState(prev => ({ ...prev, status: 'success' }));
       toast.success('Document ready!');
       if (onUploadComplete) {
         onUploadComplete(uploadState.documentId!);
       }
     }
-  }, [docStatus, onUploadComplete, uploadState.documentId]);
+
+    if (docStatus.documentStatus === 'failed' && uploadState.status !== 'error') {
+      setUploadState(prev => ({
+        ...prev,
+        status: 'error',
+        error: 'Document ingestion failed. Please retry.',
+      }));
+      toast.error('Document ingestion failed.');
+    }
+  }, [docStatus, onUploadComplete, uploadState.documentId, uploadState.status]);
+
+  const handleRetryIngestion = useCallback(async () => {
+    if (!uploadState.documentId) return;
+
+    setUploadState((prev) => ({
+      ...prev,
+      status: 'processing',
+      progress: 100,
+      error: undefined,
+    }));
+
+    const started = await startIngestionWithRetry(uploadState.documentId);
+    if (!started) {
+      setUploadState((prev) => ({
+        ...prev,
+        status: 'error',
+        error: 'Could not restart ingestion. Please try again.',
+      }));
+    }
+  }, [startIngestionWithRetry, uploadState.documentId]);
 
   // Handle file selection
   const handleFileSelect = useCallback(async (file: File) => {
@@ -133,9 +317,9 @@ export function DocumentUpload({ chatId, onUploadComplete }: DocumentUploadProps
 
     try {
       const data = await uploadMutation.mutateAsync({ chatId, file });
-      await handleUploadSuccess(data);
+      await handleUploadSuccess(data, file.name);
     } catch (error: any) {
-      handleUploadError(error);
+      await handleUploadError(error, file.name);
     } finally {
       clearInterval(progressInterval);
     }
@@ -220,6 +404,33 @@ export function DocumentUpload({ chatId, onUploadComplete }: DocumentUploadProps
             </div>
             <Button variant="ghost" size="sm" onClick={handleReset}>
               Upload another
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Error Recovery */}
+      {uploadState.status === 'error' && uploadState.documentId && (
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center">
+              <FileText className="w-5 h-5 text-red-400" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-red-300">
+                {uploadState.error || 'Document processing failed.'}
+              </p>
+              <p className="text-xs text-white/50">
+                Retry ingestion to continue.
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleRetryIngestion}
+              isLoading={ingestMutation.isPending}
+            >
+              Retry ingestion
             </Button>
           </div>
         </div>

@@ -24,6 +24,92 @@ interface MessageBubbleProps {
   message: Message;
 }
 
+function renderInlineMarkdown(text: string) {
+  const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).filter(Boolean);
+
+  return parts.map((part, index) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return (
+        <strong key={index} className="font-semibold text-white">
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+
+    if (part.startsWith('`') && part.endsWith('`')) {
+      return (
+        <code key={index} className="px-1 py-0.5 rounded bg-white/10 text-indigo-200 text-xs">
+          {part.slice(1, -1)}
+        </code>
+      );
+    }
+
+    return <span key={index}>{part}</span>;
+  });
+}
+
+function renderAssistantContent(content: string) {
+  const lines = content.split('\n');
+  const blocks: React.ReactNode[] = [];
+  let listItems: string[] = [];
+  let key = 0;
+
+  const flushList = () => {
+    if (listItems.length === 0) return;
+    const currentItems = listItems;
+    listItems = [];
+    blocks.push(
+      <ul key={`ul-${key++}`} className="list-disc pl-5 space-y-1 text-sm text-white/90">
+        {currentItems.map((item, idx) => (
+          <li key={idx}>{renderInlineMarkdown(item)}</li>
+        ))}
+      </ul>
+    );
+  };
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const listMatch = trimmed.match(/^[-*]\s+(.+)$/);
+
+    if (listMatch) {
+      listItems.push(listMatch[1]);
+      continue;
+    }
+
+    flushList();
+
+    if (!trimmed) {
+      blocks.push(<div key={`sp-${key++}`} className="h-2" />);
+      continue;
+    }
+
+    const headingMatch = trimmed.match(/^(#{1,6})\s+(.+)$/);
+    if (headingMatch) {
+      const level = headingMatch[1].length;
+      const headingClass =
+        level <= 2
+          ? 'text-base font-semibold text-white mt-1'
+          : 'text-sm font-semibold text-white/95 mt-1';
+
+      blocks.push(
+        <p key={`h-${key++}`} className={headingClass}>
+          {renderInlineMarkdown(headingMatch[2])}
+        </p>
+      );
+      continue;
+    }
+
+    blocks.push(
+      <p key={`p-${key++}`} className="text-sm text-white/90 leading-6">
+        {renderInlineMarkdown(trimmed)}
+      </p>
+    );
+  }
+
+  flushList();
+  return blocks;
+}
+
 export function MessageBubble({ message }: MessageBubbleProps) {
   const [copied, setCopied] = useState(false);
   const isUser = message.role === 'user';
@@ -99,14 +185,20 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         )}
 
         {/* Message text */}
-        <p
-          className={cn(
-            'text-sm whitespace-pre-wrap wrap-break-word',
-            isUser ? 'text-blue-100' : 'text-white/90'
-          )}
-        >
-          {message.content}
-        </p>
+        {isAssistant ? (
+          <div className="space-y-1 break-words">
+            {renderAssistantContent(message.content)}
+          </div>
+        ) : (
+          <p
+            className={cn(
+              'text-sm whitespace-pre-wrap break-words leading-6',
+              isUser ? 'text-blue-100' : 'text-white/90'
+            )}
+          >
+            {message.content}
+          </p>
+        )}
 
         {/* Timestamp */}
         <p className={cn(

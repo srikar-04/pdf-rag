@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { FileText, Loader2, Trash2, MoreVertical, Download } from 'lucide-react';
-import { cn } from '../../lib/utils';
+import { cn, getDisplayDocumentName } from '../../lib/utils';
 import type { Document, DocumentStatus } from '../../types';
 import { formatDistanceToNow } from 'date-fns';
 import { useState } from 'react';
@@ -62,8 +62,7 @@ export function DocumentCard({ document, onDelete, onSelect }: DocumentCardProps
     }
   };
 
-  // Format document name (remove hash prefix)
-  const displayName = document.documentName.split('_').slice(2).join('_') || document.documentName;
+  const displayName = document.displayName || getDisplayDocumentName(document.documentName);
 
   return (
     <motion.div

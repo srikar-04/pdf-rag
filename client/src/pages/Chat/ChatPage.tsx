@@ -1,12 +1,15 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { MessageList, ChatInput } from '../../components/chat';
 import { DocumentUpload } from '../../components/document';
-import { useMessages, useSendMessage, useChat } from '../../hooks';
+import { useMessages, useSendMessage, useChat, useDocumentStatus } from '../../hooks';
 import { useAppStore } from '../../lib/store';
 import { Button } from '../../components/ui';
 import { FileText, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
+import { cn } from '../../lib/utils';
+import type { IngestionStep } from '../../types';
 
 /**
  * ChatPage Component
@@ -28,6 +31,7 @@ import { toast } from 'sonner';
 export default function ChatPage() {
   const { chatId } = useParams<{ chatId: string }>();
   const [showUpload, setShowUpload] = useState(false);
+  const queryClient = useQueryClient();
 
   // React Query hooks
   const { data: chat, isLoading: chatLoading } = useChat(chatId || '');
@@ -35,7 +39,44 @@ export default function ChatPage() {
   const sendMessageMutation = useSendMessage();
 
   // Get first document ID from chat
-  const documentId = chat?.documents?.[0]?.id;
+  const selectedDocument = chat?.documents?.[0];
+  const documentId = selectedDocument?.id;
+  const { data: polledDocumentStatus } = useDocumentStatus(documentId || '');
+
+  const effectiveDocumentStatus = polledDocumentStatus?.documentStatus || selectedDocument?.documentStatus;
+  const effectiveIngestionStep = (polledDocumentStatus?.ingestionStep || selectedDocument?.ingestionStep || 'none') as IngestionStep;
+  const isDocumentReady = effectiveDocumentStatus === 'ready';
+
+  useEffect(() => {
+    if (isDocumentReady && showUpload) {
+      setShowUpload(false);
+    }
+  }, [isDocumentReady, showUpload]);
+
+  useEffect(() => {
+    if (!chatId) return;
+    if (effectiveDocumentStatus !== 'ready' && effectiveDocumentStatus !== 'failed') return;
+
+    queryClient.invalidateQueries({ queryKey: ['chat', chatId] });
+    queryClient.invalidateQueries({ queryKey: ['documents'] });
+  }, [chatId, effectiveDocumentStatus, queryClient]);
+
+  const pipelineSteps = useMemo(
+    () =>
+      [
+        { key: 'fetched', label: 'Fetched PDF' },
+        { key: 'normalized', label: 'Normalized Text' },
+        { key: 'chunked', label: 'Chunked Content' },
+        { key: 'embedded', label: 'Generated Embeddings' },
+        { key: 'upserted', label: 'Stored in Vector DB' },
+      ] as const,
+    []
+  );
+
+  const currentStepIndex = useMemo(() => {
+    if (effectiveDocumentStatus === 'ready') return pipelineSteps.length - 1;
+    return pipelineSteps.findIndex((step) => step.key === effectiveIngestionStep);
+  }, [effectiveDocumentStatus, effectiveIngestionStep, pipelineSteps]);
 
   // Zustand store for streaming state
   const { isStreaming, startStreaming, endStreaming } = useAppStore();
@@ -52,6 +93,11 @@ export default function ChatPage() {
       return;
     }
 
+    if (!isDocumentReady) {
+      toast.error('Document is still processing. Please wait until it is ready.');
+      return;
+    }
+
     // Start streaming state
     startStreaming();
 
@@ -61,7 +107,6 @@ export default function ChatPage() {
         documentId,
         query: content,
       });
-      toast.success('Message sent');
     } catch (error) {
       console.error('Send message error:', error);
       toast.error('Failed to send message');
@@ -153,10 +198,68 @@ export default function ChatPage() {
       </div>
 
       {/* Chat Input */}
+      {!isDocumentReady && (
+        <div className="px-4 pb-3">
+          <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3">
+            <p className="text-xs font-medium text-amber-300 mb-3">
+              Document pipeline: {effectiveDocumentStatus || 'processing'}
+            </p>
+            <div className="space-y-2">
+              {pipelineSteps.map((step, index) => {
+                const isComplete = currentStepIndex !== -1 && index < currentStepIndex;
+                const isCurrent = currentStepIndex === index && effectiveDocumentStatus !== 'failed';
+                const isFailed = effectiveDocumentStatus === 'failed' && currentStepIndex === index;
+                const connectorDone = index < currentStepIndex;
+
+                return (
+                  <div key={step.key} className="flex gap-2.5">
+                    <div className="flex flex-col items-center">
+                      <div
+                        className={cn(
+                          'h-5 w-5 rounded-full border text-[10px] font-semibold flex items-center justify-center',
+                          isComplete && 'border-green-400 bg-green-500/20 text-green-300',
+                          isCurrent && !isFailed && 'border-amber-300 bg-amber-500/20 text-amber-200 animate-pulse',
+                          isFailed && 'border-red-300 bg-red-500/20 text-red-200',
+                          !isComplete && !isCurrent && !isFailed && 'border-white/20 bg-white/5 text-white/50'
+                        )}
+                      >
+                        {isComplete ? '✓' : index + 1}
+                      </div>
+                      {index < pipelineSteps.length - 1 && (
+                        <div
+                          className={cn(
+                            'w-px h-4 mt-1',
+                            connectorDone ? 'bg-green-400/70' : 'bg-white/15'
+                          )}
+                        />
+                      )}
+                    </div>
+                    <p
+                      className={cn(
+                        'text-xs pt-0.5',
+                        isComplete && 'text-green-300',
+                        isCurrent && !isFailed && 'text-amber-200',
+                        isFailed && 'text-red-200',
+                        !isComplete && !isCurrent && !isFailed && 'text-white/60'
+                      )}
+                    >
+                      {step.label}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-[11px] text-amber-200/80 mt-2">
+              Messaging will be enabled automatically when this reaches the final step.
+            </p>
+          </div>
+        </div>
+      )}
+
       <ChatInput
         onSend={handleSendMessage}
         isLoading={isStreaming || sendMessageMutation.isPending}
-        disabled={sendMessageMutation.isPending}
+        disabled={sendMessageMutation.isPending || !isDocumentReady}
         chatId={chatId}
       />
     </div>
