@@ -9,6 +9,7 @@ const googleClientId = process.env.AUTH_GOOGLE_ID
 const googleClientSecret = process.env.AUTH_GOOGLE_SECRET
 
 const authSecret = process.env.AUTH_SECRET
+const isProduction = process.env.NODE_ENV === 'production'
 
 if (!githubClientId || !githubClientSecret) {
     throw new Error('AUTH_GITHUB_ID or AUTH_GITHUB_SECRET is not defined')
@@ -30,6 +31,38 @@ export const authConfig: ExpressAuthConfig = {
     secret: authSecret,
     trustHost: true,
     basePath: '/auth',
+    ...(isProduction
+        ? {
+            cookies: {
+                sessionToken: {
+                    name: "__Secure-authjs.session-token",
+                    options: {
+                        httpOnly: true,
+                        sameSite: "none",
+                        path: "/",
+                        secure: true,
+                    },
+                },
+                callbackUrl: {
+                    name: "__Secure-authjs.callback-url",
+                    options: {
+                        sameSite: "none",
+                        path: "/",
+                        secure: true,
+                    },
+                },
+                csrfToken: {
+                    name: "__Host-authjs.csrf-token",
+                    options: {
+                        httpOnly: true,
+                        sameSite: "none",
+                        path: "/",
+                        secure: true,
+                    },
+                },
+            },
+        }
+        : {}),
     callbacks: {
         async signIn({ user, account, credentials, profile, email }) {
             console.log(user.id, user.name, user.email, user.image)
