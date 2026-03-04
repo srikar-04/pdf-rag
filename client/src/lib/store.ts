@@ -9,6 +9,10 @@ const getBackendUrl = () => {
   return apiUrl.replace('/api/v1', '');
 };
 
+interface AuthCsrfResponse {
+  csrfToken?: string;
+}
+
 /**
  * Auth Store (Zustand)
  * 
@@ -118,21 +122,49 @@ export const useAuthStore = create<AuthState>()(
       
       /**
        * Logout user
-       * OAuth handles logout automatically - we just clear local state
-       * Redirect to OAuth signout endpoint to clear session cookie
+       * Uses Auth.js signout action (POST + CSRF) and redirects to signin
        */
       logout: async () => {
         try {
-          // Clear auth state first
+          const backendUrl = getBackendUrl();
+          const csrfResponse = await fetch(`${backendUrl}/auth/csrf`, {
+            method: 'GET',
+            credentials: 'include',
+          });
+
+          if (!csrfResponse.ok) {
+            throw new Error(`Failed to fetch CSRF token: ${csrfResponse.status}`);
+          }
+
+          const csrfData = (await csrfResponse.json()) as AuthCsrfResponse;
+          if (!csrfData.csrfToken) {
+            throw new Error('CSRF token missing in response');
+          }
+
+          // Clear local auth state before navigating away
           get().clearAuth();
-          
-          // Redirect to OAuth signout to clear session cookie
-          // Auth.js creates /auth/signout route - need full backend URL
-          window.location.href = `${getBackendUrl()}/auth/signout`;
+
+          const form = document.createElement('form');
+          form.method = 'POST';
+          form.action = `${backendUrl}/auth/signout`;
+          form.style.display = 'none';
+
+          const csrfInput = document.createElement('input');
+          csrfInput.type = 'hidden';
+          csrfInput.name = 'csrfToken';
+          csrfInput.value = csrfData.csrfToken;
+          form.appendChild(csrfInput);
+
+          const callbackInput = document.createElement('input');
+          callbackInput.type = 'hidden';
+          callbackInput.name = 'callbackUrl';
+          callbackInput.value = `${window.location.origin}/auth/signin`;
+          form.appendChild(callbackInput);
+
+          document.body.appendChild(form);
+          form.submit();
         } catch (error) {
           console.error('Logout error:', error);
-          // Still clear auth state even if redirect fails
-          get().clearAuth();
         }
       },
       

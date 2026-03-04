@@ -37,14 +37,34 @@ export const authConfig: ExpressAuthConfig = {
             return true
         },
         async redirect({ url, baseUrl }: { url: string, baseUrl: string }) {
+            const frontendUrl = process.env.FRONTEND_URL || process.env.CORS_ORIGIN || baseUrl;
+            const normalizedFrontendUrl = frontendUrl.replace(/\/$/, '');
+
             // Allow callback URLs to pass through to Auth.js
             if (url.includes('/auth/callback/')) {
                 return url;
             }
-            // After successful OAuth, redirect to frontend
-            const redirectUrl = process.env.FRONTEND_URL || process.env.CORS_ORIGIN || baseUrl;
-            console.log('OAuth redirect to:', redirectUrl);
-            return redirectUrl;
+
+            // Allow relative URLs and map them to frontend origin
+            if (url.startsWith('/')) {
+                return `${normalizedFrontendUrl}${url}`;
+            }
+
+            // Allow absolute URLs on frontend/backend origins
+            try {
+                const parsedUrl = new URL(url);
+                const frontendOrigin = new URL(frontendUrl).origin;
+                const backendOrigin = new URL(baseUrl).origin;
+
+                if (parsedUrl.origin === frontendOrigin || parsedUrl.origin === backendOrigin) {
+                    return url;
+                }
+            } catch {
+                // Fall through to default redirect below
+            }
+
+            // Default safe redirect target
+            return frontendUrl;
         },
         async jwt({ token, user, account }) {
             if (user) {
