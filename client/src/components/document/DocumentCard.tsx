@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { FileText, Loader2, Trash2, MoreVertical, Download } from 'lucide-react';
+import { FileText, Loader2, Trash2, MoreVertical, MessageSquare } from 'lucide-react';
 import { cn, getDisplayDocumentName } from '../../lib/utils';
 import type { Document, DocumentStatus } from '../../types';
 import { formatDistanceToNow } from 'date-fns';
@@ -146,7 +146,7 @@ export function DocumentCard({ document, onDelete, onSelect }: DocumentCardProps
                       }}
                       className="flex items-center gap-2 w-full px-3 py-2 text-sm text-white/70 hover:text-white hover:bg-white/5"
                     >
-                      <Download className="w-4 h-4" />
+                      <MessageSquare className="w-4 h-4" />
                       Use in Chat
                     </button>
                   )}

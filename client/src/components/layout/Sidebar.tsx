@@ -208,7 +208,7 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
                       </span>
                       {/* Delete button (visible on hover) */}
                       <button
-                        className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-500/10 text-white/40 hover:text-red-400 transition-all"
+                        className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 p-1 rounded hover:bg-red-500/10 text-white/40 hover:text-red-400 transition-all"
                         onClick={(e) => handleDeleteChat(e, chat.id)}
                         aria-label="Delete chat"
                       >

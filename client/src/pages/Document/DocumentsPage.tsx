@@ -20,7 +20,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '../../components/ui';
-import { Plus, Search, FileText, Filter, Loader2 } from 'lucide-react';
+import { Plus, Search, FileText, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getDisplayDocumentName } from '../../lib/utils';
 
@@ -199,7 +199,7 @@ export default function DocumentsPage() {
         </Card>
       )}
 
-      {/* Search & Filters */}
+      {/* Search */}
       <div className="flex items-center gap-4">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
@@ -211,10 +211,6 @@ export default function DocumentsPage() {
             className="w-full bg-white/5 border border-white/10 rounded-lg pl-10 pr-4 py-2.5 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
           />
         </div>
-
-        <Button variant="ghost" leftIcon={<Filter className="w-4 h-4" />}>
-          Filter
-        </Button>
       </div>
 
       {/* Documents Grid */}

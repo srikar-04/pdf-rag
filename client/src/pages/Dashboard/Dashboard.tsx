@@ -76,7 +76,7 @@ export default function Dashboard() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-2xl lg:text-3xl font-bold text-white">
-            {getGreeting()}, {user?.username || 'there'}! 👋
+            {getGreeting()}, {user?.username || 'there'}
           </h1>
           <p className="text-white/60 mt-1">
             What would you like to work on today?
@@ -172,11 +172,24 @@ export default function Dashboard() {
               <div className="py-8 text-center">
                 <MessageSquare className="w-10 h-10 text-white/20 mx-auto mb-2" />
                 <p className="text-white/60 text-sm">No chats yet</p>
-                <Link to="/dashboard">
-                  <Button variant="ghost" size="sm" className="mt-2">
-                    Start your first chat
-                  </Button>
-                </Link>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="mt-2"
+                  onClick={async () => {
+                    try {
+                      const newChat = await createChatMutation.mutateAsync({
+                        title: 'New Chat',
+                      });
+                      navigate(`/chat/${newChat.id}`);
+                    } catch (error) {
+                      toast.error('Failed to create chat');
+                    }
+                  }}
+                  isLoading={createChatMutation.isPending}
+                >
+                  Start your first chat
+                </Button>
               </div>
             ) : (
               // Chat list
@@ -266,7 +279,7 @@ export default function Dashboard() {
                     <div className={cn(
                       'w-2 h-2 rounded-full',
                       doc.documentStatus === 'ready' && 'bg-green-500',
-                      doc.documentStatus === 'processing' && 'bg-yellow-500 animate-pulse',
+                      (doc.documentStatus === 'processing' || doc.documentStatus === 'Ingesting') && 'bg-yellow-500 animate-pulse',
                       doc.documentStatus === 'failed' && 'bg-red-500'
                     )} />
                   </div>

@@ -42,7 +42,14 @@ export function MainLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a]">
+    <div className="min-h-screen bg-[#0a0a0a] relative overflow-hidden">
+      {/* Ambient gradients for depth; improves glass readability without changing component styles. */}
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -top-32 -left-24 w-[28rem] h-[28rem] rounded-full bg-indigo-500/10 blur-3xl" />
+        <div className="absolute top-1/4 -right-24 w-[24rem] h-[24rem] rounded-full bg-cyan-500/8 blur-3xl" />
+        <div className="absolute -bottom-28 left-1/3 w-[22rem] h-[22rem] rounded-full bg-purple-500/8 blur-3xl" />
+      </div>
+
       {/* Header - Fixed at top */}
       <Header 
         onMenuToggle={handleMenuToggle}
@@ -56,7 +63,7 @@ export function MainLayout() {
       />
 
       {/* Main Content Area */}
-      <main className="lg:ml-72 pt-16 min-h-screen">
+      <main className="lg:ml-72 pt-16 min-h-screen relative z-10">
         <div className="p-4 lg:p-6">
           {/* Page content renders here */}
           <Outlet />
