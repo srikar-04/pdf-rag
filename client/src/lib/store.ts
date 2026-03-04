@@ -73,13 +73,18 @@ export const useAuthStore = create<AuthState>()(
           set({ isLoading: true });
           
           const response = await apiEndpoints.auth.session();
-          
-          if (response.data.success && response.data.data.user) {
+
+          if (response.data.success) {
+            const sessionData = response.data.data;
+            const hasUser = !!sessionData?.user;
+            const needsOnboarding = !!sessionData?.onBoardingRequired;
+
+            // Session can be valid even before app-level user profile is created.
             set({
-              user: response.data.data.user,
-              isAuthenticated: true,
+              user: sessionData?.user || null,
+              isAuthenticated: hasUser || needsOnboarding,
               isLoading: false,
-              onBoardingRequired: response.data.data.onBoardingRequired || false,
+              onBoardingRequired: needsOnboarding,
             });
           } else {
             set({

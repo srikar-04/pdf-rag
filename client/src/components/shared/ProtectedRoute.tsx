@@ -22,7 +22,7 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated, isLoading } = useAuthStore();
+  const { isAuthenticated, onBoardingRequired, isLoading } = useAuthStore();
   const location = useLocation();
   
   // Show loading spinner while checking session
@@ -41,6 +41,11 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   if (!isAuthenticated) {
     // Save the current location for post-login redirect
     return <Navigate to="/auth/signin" state={{ from: location }} replace />;
+  }
+
+  // Authenticated but profile setup is incomplete
+  if (onBoardingRequired) {
+    return <Navigate to="/auth/onboarding" replace />;
   }
   
   // Render children if authenticated
@@ -61,7 +66,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
  */
 
 export function PublicOnlyRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated, isLoading } = useAuthStore();
+  const { isAuthenticated, onBoardingRequired, isLoading } = useAuthStore();
   const location = useLocation();
   
   // Show loading spinner while checking session
@@ -76,6 +81,11 @@ export function PublicOnlyRoute({ children }: ProtectedRouteProps) {
     );
   }
   
+  // If authenticated but onboarding pending, always send to onboarding first.
+  if (isAuthenticated && onBoardingRequired) {
+    return <Navigate to="/auth/onboarding" replace />;
+  }
+
   // If authenticated, redirect to dashboard (or intended destination)
   if (isAuthenticated) {
     const from = location.state?.from?.pathname || '/dashboard';
@@ -83,7 +93,6 @@ export function PublicOnlyRoute({ children }: ProtectedRouteProps) {
   }
   
   // Render children if not authenticated
-  console.log('returning childern, user is not authenticated: in ProtectedRoute.tsx file')
   return children ? <>{children}</> : <Outlet />;
 }
 
@@ -121,12 +130,11 @@ export function OnboardingRoute({ children }: ProtectedRouteProps) {
     return <Navigate to="/auth/signin" state={{ from: location }} replace />;
   }
   
-  // If onboarding is required, redirect to onboarding page
-  if (onBoardingRequired) {
-    return <Navigate to="/auth/onboarding" replace />;
+  // If onboarding is already complete, onboarding page should not be accessible.
+  if (!onBoardingRequired) {
+    return <Navigate to="/dashboard" replace />;
   }
   
-  // Render children if authenticated and onboarding not required
-  console.log('returning childer, on boarding not required, already onboarded: in ProtectedRoute.tsx file')
+  // Render children if authenticated and onboarding is still required
   return children ? <>{children}</> : <Outlet />;
 }
