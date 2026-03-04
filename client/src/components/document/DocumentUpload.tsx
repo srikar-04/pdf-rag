@@ -32,6 +32,8 @@ import type { DocumentStatus, IngestionStep, DocumentUploadResponse } from '../.
 interface DocumentUploadProps {
   chatId: string;
   onUploadComplete?: (documentId: string) => void;
+  queuedFile?: File | null;
+  onQueuedFileConsumed?: () => void;
 }
 
 interface ResolvedDocument {
@@ -87,7 +89,12 @@ const OCR_NOT_SUPPORTED_MESSAGE =
   'No extractable text was found. This looks like a scanned/image-only PDF. OCR is not supported yet, so please upload a text-based PDF.';
 const MAX_UPLOAD_SIZE_BYTES = 15 * 1024 * 1024;
 
-export function DocumentUpload({ chatId, onUploadComplete }: DocumentUploadProps) {
+export function DocumentUpload({
+  chatId,
+  onUploadComplete,
+  queuedFile = null,
+  onQueuedFileConsumed,
+}: DocumentUploadProps) {
   const queryClient = useQueryClient();
   const [uploadState, setUploadState] = useState<{
     status: 'idle' | 'uploading' | 'processing' | 'success' | 'error';
@@ -409,6 +416,14 @@ export function DocumentUpload({ chatId, onUploadComplete }: DocumentUploadProps
       clearInterval(progressInterval);
     }
   }, [uploadWithRetry, handleUploadSuccess, handleUploadError]);
+
+  useEffect(() => {
+    if (!queuedFile) return;
+    if (uploadState.status === 'uploading' || uploadState.status === 'processing') return;
+
+    void handleFileSelect(queuedFile);
+    onQueuedFileConsumed?.();
+  }, [handleFileSelect, onQueuedFileConsumed, queuedFile, uploadState.status]);
 
   // Handle reset (start new upload)
   const handleReset = () => {

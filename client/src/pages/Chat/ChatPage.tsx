@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { MessageList, ChatInput } from '../../components/chat';
 import { DocumentUpload } from '../../components/document';
@@ -31,9 +31,12 @@ import type { IngestionStep } from '../../types';
 export default function ChatPage() {
   const { chatId } = useParams<{ chatId: string }>();
   const [showUpload, setShowUpload] = useState(false);
+  const [isPageDragActive, setIsPageDragActive] = useState(false);
+  const [queuedUploadFile, setQueuedUploadFile] = useState<File | null>(null);
   const [uploadFailureNotice, setUploadFailureNotice] = useState<string | null>(null);
   const hasShownFailureToastRef = useRef(false);
   const wasDocumentReadyRef = useRef(false);
+  const dragDepthRef = useRef(0);
   const queryClient = useQueryClient();
 
   // React Query hooks
@@ -50,6 +53,69 @@ export default function ChatPage() {
   const effectiveIngestionStep = (polledDocumentStatus?.ingestionStep || selectedDocument?.ingestionStep || 'none') as IngestionStep;
   const failureReason = polledDocumentStatus?.failureReason;
   const isDocumentReady = effectiveDocumentStatus === 'ready';
+
+  const consumeQueuedUploadFile = useCallback(() => {
+    setQueuedUploadFile(null);
+  }, []);
+
+  useEffect(() => {
+    const hasFiles = (e: DragEvent) =>
+      Array.from(e.dataTransfer?.types || []).includes('Files');
+
+    const handleDragEnter = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      dragDepthRef.current += 1;
+      setIsPageDragActive(true);
+    };
+
+    const handleDragOver = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      if (e.dataTransfer) {
+        e.dataTransfer.dropEffect = 'copy';
+      }
+      setIsPageDragActive(true);
+    };
+
+    const handleDragLeave = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+      if (dragDepthRef.current === 0) {
+        setIsPageDragActive(false);
+      }
+    };
+
+    const handleDrop = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      dragDepthRef.current = 0;
+      setIsPageDragActive(false);
+
+      const file = e.dataTransfer?.files?.[0];
+      if (!file) return;
+      if (file.type !== 'application/pdf') {
+        toast.error('Only PDF files are allowed');
+        return;
+      }
+
+      setShowUpload(true);
+      setQueuedUploadFile(file);
+    };
+
+    window.addEventListener('dragenter', handleDragEnter);
+    window.addEventListener('dragover', handleDragOver);
+    window.addEventListener('dragleave', handleDragLeave);
+    window.addEventListener('drop', handleDrop);
+
+    return () => {
+      window.removeEventListener('dragenter', handleDragEnter);
+      window.removeEventListener('dragover', handleDragOver);
+      window.removeEventListener('dragleave', handleDragLeave);
+      window.removeEventListener('drop', handleDrop);
+    };
+  }, []);
 
   useEffect(() => {
     // Auto-close upload panel only on transition to ready (not on manual re-open later).
@@ -164,41 +230,58 @@ export default function ChatPage() {
   // No document attached state
   if (!documentId) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
-        <div className="w-20 h-20 rounded-2xl bg-amber-500/10 flex items-center justify-center mb-4">
-          <AlertCircle className="w-10 h-10 text-amber-400" />
-        </div>
-        <h3 className="text-lg font-medium text-white mb-2">
-          No document attached
-        </h3>
-        <p className="text-sm text-white/50 max-w-sm mb-6">
-          Upload a PDF document to this chat to start asking questions about it.
-        </p>
-        {uploadFailureNotice && (
-          <div className="w-full max-w-xl mb-6 rounded-lg border border-red-500/40 bg-red-500/15 p-4 text-left">
-            <p className="text-sm font-semibold text-red-200 mb-1">Why upload failed</p>
-            <p className="text-sm text-red-100 leading-6">{uploadFailureNotice}</p>
+      <div className="relative flex-1">
+        <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
+          <div className="w-20 h-20 rounded-2xl bg-amber-500/10 flex items-center justify-center mb-4">
+            <AlertCircle className="w-10 h-10 text-amber-400" />
           </div>
-        )}
-        <Button
-          variant="primary"
-          onClick={() => setShowUpload(true)}
-          leftIcon={<FileText className="w-4 h-4" />}
-        >
-          Upload Document
-        </Button>
+          <h3 className="text-lg font-medium text-white mb-2">
+            No document attached
+          </h3>
+          <p className="text-sm text-white/50 max-w-sm mb-6">
+            Upload a PDF document to this chat to start asking questions about it.
+          </p>
+          {uploadFailureNotice && (
+            <div className="w-full max-w-xl mb-6 rounded-lg border border-red-500/40 bg-red-500/15 p-4 text-left">
+              <p className="text-sm font-semibold text-red-200 mb-1">Why upload failed</p>
+              <p className="text-sm text-red-100 leading-6">{uploadFailureNotice}</p>
+            </div>
+          )}
+          <Button
+            variant="primary"
+            onClick={() => setShowUpload(true)}
+            leftIcon={<FileText className="w-4 h-4" />}
+          >
+            Upload Document
+          </Button>
 
-        {showUpload && (
-          <div className="mt-6 w-full max-w-xl">
-            <DocumentUpload
-              chatId={chatId || ''}
-              onUploadComplete={() => {
-                setShowUpload(false);
-                setUploadFailureNotice(null);
-                hasShownFailureToastRef.current = false;
-                toast.success('Document uploaded and ready!');
-              }}
-            />
+          {showUpload && (
+            <div className="mt-6 w-full max-w-xl">
+              <DocumentUpload
+                chatId={chatId || ''}
+                queuedFile={queuedUploadFile}
+                onQueuedFileConsumed={consumeQueuedUploadFile}
+                onUploadComplete={() => {
+                  setShowUpload(false);
+                  setUploadFailureNotice(null);
+                  setQueuedUploadFile(null);
+                  hasShownFailureToastRef.current = false;
+                  toast.success('Document uploaded and ready!');
+                }}
+              />
+            </div>
+          )}
+        </div>
+
+        {isPageDragActive && (
+          <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center bg-slate-950/65 backdrop-blur-sm">
+            <div className="w-full max-w-xl rounded-2xl border-2 border-dashed border-indigo-400/70 bg-indigo-500/10 p-10 text-center shadow-2xl">
+              <div className="mx-auto mb-4 w-14 h-14 rounded-xl bg-indigo-500/20 flex items-center justify-center">
+                <FileText className="w-7 h-7 text-indigo-300" />
+              </div>
+              <p className="text-lg font-semibold text-indigo-100">Drop PDF to upload to this chat</p>
+              <p className="mt-2 text-sm text-indigo-200/85">Release to start upload immediately</p>
+            </div>
           </div>
         )}
       </div>
@@ -206,7 +289,7 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="relative flex flex-col h-full">
       {/* Messages Area */}
       <MessageList messages={messages || []} isLoading={isLoading} />
 
@@ -215,9 +298,12 @@ export default function ChatPage() {
         <div className="px-4 pb-2">
           <DocumentUpload
             chatId={chatId || ''}
+            queuedFile={queuedUploadFile}
+            onQueuedFileConsumed={consumeQueuedUploadFile}
             onUploadComplete={() => {
               setShowUpload(false);
               setUploadFailureNotice(null);
+              setQueuedUploadFile(null);
               hasShownFailureToastRef.current = false;
               toast.success('Document uploaded and ready!');
             }}
@@ -331,6 +417,18 @@ export default function ChatPage() {
         disabled={sendMessageMutation.isPending || !isDocumentReady}
         chatId={chatId}
       />
+
+      {isPageDragActive && (
+        <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center bg-slate-950/65 backdrop-blur-sm">
+          <div className="w-full max-w-xl rounded-2xl border-2 border-dashed border-indigo-400/70 bg-indigo-500/10 p-10 text-center shadow-2xl">
+            <div className="mx-auto mb-4 w-14 h-14 rounded-xl bg-indigo-500/20 flex items-center justify-center">
+              <FileText className="w-7 h-7 text-indigo-300" />
+            </div>
+            <p className="text-lg font-semibold text-indigo-100">Drop PDF to upload to this chat</p>
+            <p className="mt-2 text-sm text-indigo-200/85">Release to start upload immediately</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

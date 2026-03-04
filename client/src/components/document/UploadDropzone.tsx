@@ -1,6 +1,6 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, AlertCircle } from 'lucide-react';
+import { Upload, AlertCircle, Info } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 /**
@@ -40,11 +40,31 @@ export function UploadDropzone({
   errorMessage,
 }: UploadDropzoneProps) {
   const [isDragOver, setIsDragOver] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const preventFileDropNavigation = (e: DragEvent) => {
+      const hasFiles = Array.from(e.dataTransfer?.types || []).includes('Files');
+      if (!hasFiles) return;
+      e.preventDefault();
+    };
+
+    window.addEventListener('dragover', preventFileDropNavigation);
+    window.addEventListener('drop', preventFileDropNavigation);
+
+    return () => {
+      window.removeEventListener('dragover', preventFileDropNavigation);
+      window.removeEventListener('drop', preventFileDropNavigation);
+    };
+  }, []);
 
   // Handle drag events
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'copy';
+    }
     setIsDragOver(true);
   }, []);
 
@@ -77,6 +97,11 @@ export function UploadDropzone({
     input.value = '';
   }, [onFileSelect]);
 
+  const handleBrowseClick = useCallback(() => {
+    if (isUploading) return;
+    inputRef.current?.click();
+  }, [isUploading]);
+
   // Don't show dropzone if already uploading successfully
   if (uploadStatus === 'success') {
     return null;
@@ -101,9 +126,19 @@ export function UploadDropzone({
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
+        onClick={handleBrowseClick}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleBrowseClick();
+          }
+        }}
+        role="button"
+        tabIndex={0}
         className={cn(
           'relative border-2 border-dashed rounded-xl p-8 text-center transition-all',
-          'hover:border-white/20 hover:bg-white/5',
+          'hover:border-white/20 hover:bg-white/5 cursor-pointer',
+          'focus:outline-none focus:ring-2 focus:ring-indigo-500/40',
           isDragOver ? 'border-indigo-500 bg-indigo-500/5' : 'border-white/10',
           isUploading && 'pointer-events-none opacity-50'
         )}
@@ -136,13 +171,14 @@ export function UploadDropzone({
           </p>
         </div>
 
-        {/* File Input (hidden) */}
+        {/* File Input (visually hidden) */}
         <input
+          ref={inputRef}
           type="file"
           accept="application/pdf"
           onChange={handleFileInput}
           disabled={isUploading}
-          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+          className="hidden"
         />
 
         {/* Error Message */}
@@ -157,6 +193,15 @@ export function UploadDropzone({
           </motion.div>
         )}
       </div>
+
+      {!isUploading && (
+        <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2">
+          <Info className="w-4 h-4 text-amber-300 shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-100/90 leading-5 text-left">
+            Best results come from text-based PDFs. Scanned/image-only PDFs may fail until OCR support is added.
+          </p>
+        </div>
+      )}
 
       {/* Progress Bar */}
       {isUploading && (
