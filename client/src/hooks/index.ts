@@ -205,6 +205,12 @@ export const useDocumentStatus = (
     
     // Don't cache stale data
     staleTime: 0,
+
+    // Avoid noisy retries when document is auto-removed (404).
+    retry: (failureCount, error: any) => {
+      if (error?.response?.status === 404) return false;
+      return failureCount < 2;
+    },
     
     ...options,
   });

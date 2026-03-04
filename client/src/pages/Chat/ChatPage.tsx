@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { MessageList, ChatInput } from '../../components/chat';
 import { DocumentUpload } from '../../components/document';
 import { useMessages, useSendMessage, useChat, useDocumentStatus } from '../../hooks';
 import { useAppStore } from '../../lib/store';
 import { Button } from '../../components/ui';
-import { FileText, AlertCircle } from 'lucide-react';
+import { FileText, AlertCircle, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { cn } from '../../lib/utils';
@@ -31,6 +31,8 @@ import type { IngestionStep } from '../../types';
 export default function ChatPage() {
   const { chatId } = useParams<{ chatId: string }>();
   const [showUpload, setShowUpload] = useState(false);
+  const [uploadFailureNotice, setUploadFailureNotice] = useState<string | null>(null);
+  const hasShownFailureToastRef = useRef(false);
   const queryClient = useQueryClient();
 
   // React Query hooks
@@ -41,7 +43,7 @@ export default function ChatPage() {
   // Get first document ID from chat
   const selectedDocument = chat?.documents?.[0];
   const documentId = selectedDocument?.id;
-  const { data: polledDocumentStatus } = useDocumentStatus(documentId || '');
+  const { data: polledDocumentStatus, isError: documentStatusError, error: documentStatusQueryError } = useDocumentStatus(documentId || '');
 
   const effectiveDocumentStatus = polledDocumentStatus?.documentStatus || selectedDocument?.documentStatus;
   const effectiveIngestionStep = (polledDocumentStatus?.ingestionStep || selectedDocument?.ingestionStep || 'none') as IngestionStep;
@@ -61,6 +63,31 @@ export default function ChatPage() {
     queryClient.invalidateQueries({ queryKey: ['chat', chatId] });
     queryClient.invalidateQueries({ queryKey: ['documents'] });
   }, [chatId, effectiveDocumentStatus, queryClient]);
+
+  useEffect(() => {
+    if (!chatId || !documentStatusError) return;
+    const statusCode = (documentStatusQueryError as any)?.response?.status;
+    if (statusCode !== 404) return;
+
+    const failureMessage =
+      'Upload failed because this PDF appears scanned/image-only. OCR is not supported yet. Please upload a text-based PDF.';
+
+    setShowUpload(false);
+    setUploadFailureNotice(failureMessage);
+    if (!hasShownFailureToastRef.current) {
+      toast.error(failureMessage);
+      hasShownFailureToastRef.current = true;
+    }
+
+    queryClient.invalidateQueries({ queryKey: ['chat', chatId] });
+    queryClient.invalidateQueries({ queryKey: ['documents'] });
+  }, [chatId, documentStatusError, documentStatusQueryError, queryClient]);
+
+  useEffect(() => {
+    if (!documentId) return;
+    setUploadFailureNotice(null);
+    hasShownFailureToastRef.current = false;
+  }, [documentId]);
 
   const pipelineSteps = useMemo(
     () =>
@@ -144,6 +171,12 @@ export default function ChatPage() {
         <p className="text-sm text-white/50 max-w-sm mb-6">
           Upload a PDF document to this chat to start asking questions about it.
         </p>
+        {uploadFailureNotice && (
+          <div className="w-full max-w-xl mb-6 rounded-lg border border-red-500/40 bg-red-500/15 p-4 text-left">
+            <p className="text-sm font-semibold text-red-200 mb-1">Why upload failed</p>
+            <p className="text-sm text-red-100 leading-6">{uploadFailureNotice}</p>
+          </div>
+        )}
         <Button
           variant="primary"
           onClick={() => setShowUpload(true)}
@@ -158,6 +191,8 @@ export default function ChatPage() {
               chatId={chatId || ''}
               onUploadComplete={() => {
                 setShowUpload(false);
+                setUploadFailureNotice(null);
+                hasShownFailureToastRef.current = false;
                 toast.success('Document uploaded and ready!');
               }}
             />
@@ -179,6 +214,8 @@ export default function ChatPage() {
             chatId={chatId || ''}
             onUploadComplete={() => {
               setShowUpload(false);
+              setUploadFailureNotice(null);
+              hasShownFailureToastRef.current = false;
               toast.success('Document uploaded and ready!');
             }}
           />
@@ -199,7 +236,38 @@ export default function ChatPage() {
       </div>
 
       {/* Chat Input */}
-      {!isDocumentReady && (
+      {effectiveDocumentStatus === 'failed' && (
+        <div className="px-4 pb-3">
+          <div className="rounded-lg border border-red-500/40 bg-red-500/15 p-4">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-4 h-4 text-red-300" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-red-200">
+                  Document ingestion failed
+                </p>
+                <p className="text-sm text-red-100 mt-1 leading-6">
+                  {failureReason || 'This PDF could not be processed. Please upload a different text-based PDF.'}
+                </p>
+                <div className="mt-3">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowUpload(true)}
+                    leftIcon={<FileText className="w-4 h-4" />}
+                    className="bg-red-500/15 border border-red-500/30 text-red-100 hover:bg-red-500/25"
+                  >
+                    Upload Another PDF
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!isDocumentReady && effectiveDocumentStatus !== 'failed' && (
         <div className="px-4 pb-3">
           <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3">
             <p className="text-xs font-medium text-amber-300 mb-3">
@@ -208,8 +276,7 @@ export default function ChatPage() {
             <div className="space-y-2">
               {pipelineSteps.map((step, index) => {
                 const isComplete = currentStepIndex !== -1 && index < currentStepIndex;
-                const isCurrent = currentStepIndex === index && effectiveDocumentStatus !== 'failed';
-                const isFailed = effectiveDocumentStatus === 'failed' && currentStepIndex === index;
+                const isCurrent = currentStepIndex === index;
                 const connectorDone = index < currentStepIndex;
 
                 return (
@@ -219,9 +286,8 @@ export default function ChatPage() {
                         className={cn(
                           'h-5 w-5 rounded-full border text-[10px] font-semibold flex items-center justify-center',
                           isComplete && 'border-green-400 bg-green-500/20 text-green-300',
-                          isCurrent && !isFailed && 'border-amber-300 bg-amber-500/20 text-amber-200 animate-pulse',
-                          isFailed && 'border-red-300 bg-red-500/20 text-red-200',
-                          !isComplete && !isCurrent && !isFailed && 'border-white/20 bg-white/5 text-white/50'
+                          isCurrent && 'border-amber-300 bg-amber-500/20 text-amber-200 animate-pulse',
+                          !isComplete && !isCurrent && 'border-white/20 bg-white/5 text-white/50'
                         )}
                       >
                         {isComplete ? '✓' : index + 1}
@@ -239,9 +305,8 @@ export default function ChatPage() {
                       className={cn(
                         'text-xs pt-0.5',
                         isComplete && 'text-green-300',
-                        isCurrent && !isFailed && 'text-amber-200',
-                        isFailed && 'text-red-200',
-                        !isComplete && !isCurrent && !isFailed && 'text-white/60'
+                        isCurrent && 'text-amber-200',
+                        !isComplete && !isCurrent && 'text-white/60'
                       )}
                     >
                       {step.label}
@@ -250,15 +315,9 @@ export default function ChatPage() {
                 );
               })}
             </div>
-            {effectiveDocumentStatus === 'failed' ? (
-              <p className="text-[11px] text-red-200/90 mt-2">
-                {failureReason || 'Document ingestion failed. Please upload a text-based PDF and try again.'}
-              </p>
-            ) : (
-              <p className="text-[11px] text-amber-200/80 mt-2">
-                Messaging will be enabled automatically when this reaches the final step.
-              </p>
-            )}
+            <p className="text-[11px] text-amber-200/80 mt-2">
+              Messaging will be enabled automatically when this reaches the final step.
+            </p>
           </div>
         </div>
       )}

@@ -8,6 +8,35 @@ import { chunking, type ChunkInfoType } from "../integrations/chunking.js";
 import { normalizeText } from "../integrations/normalize.js";
 import { embedding } from "../integrations/embedding.js";
 import { upserting } from "../integrations/upserting.js";
+import { SCANNED_PDF_ERROR_MESSAGE } from "../integrations/pdfLoader.js";
+
+const cleanupScannedDocument = async (documentId: string) => {
+    const linkedChats = await prisma.chatDocument.findMany({
+        where: { documentId },
+        select: { chatId: true }
+    });
+
+    const linkedChatIds = [...new Set(linkedChats.map((entry) => entry.chatId))];
+
+    await prisma.$transaction(async (tx) => {
+        await tx.chunkHash.deleteMany({ where: { documentId } });
+        await tx.documentMetadata.deleteMany({ where: { documentId } });
+        await tx.chatDocument.deleteMany({ where: { documentId } });
+        await tx.document.deleteMany({ where: { id: documentId } });
+    });
+
+    await Promise.all(
+        linkedChatIds.map(async (chatId) => {
+            const remainingDocs = await prisma.chatDocument.count({ where: { chatId } });
+            if (remainingDocs === 0) {
+                await prisma.chat.update({
+                    where: { id: chatId },
+                    data: { chatStatus: "empty" }
+                });
+            }
+        })
+    );
+};
 
 const documentIngestionService = async (docDetails: Document) => {
 
@@ -177,6 +206,15 @@ const documentIngestionService = async (docDetails: Document) => {
         console.error('error in ingestion pipeline : ', error)
 
         if (error instanceof IngestionError) {
+            if (error.message === SCANNED_PDF_ERROR_MESSAGE) {
+                try {
+                    await cleanupScannedDocument(docDetails.id);
+                    console.log(`removed scanned/image-only document ${docDetails.id} from database`);
+                    return;
+                } catch (cleanupError) {
+                    console.error("failed to cleanup scanned document:", cleanupError);
+                }
+            }
 
             await prisma.document.update({
                 where: { id: docDetails.id },

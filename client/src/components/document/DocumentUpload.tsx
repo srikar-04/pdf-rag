@@ -79,6 +79,9 @@ const isRetriableError = (error: any): boolean => {
 const isOcrUnsupportedMessage = (message?: string): boolean =>
   /ocr|scanned|image-only|extractable text/i.test(message || '');
 
+const OCR_NOT_SUPPORTED_MESSAGE =
+  'No extractable text was found. This looks like a scanned/image-only PDF. OCR is not supported yet, so please upload a text-based PDF.';
+
 export function DocumentUpload({ chatId, onUploadComplete }: DocumentUploadProps) {
   const queryClient = useQueryClient();
   const [uploadState, setUploadState] = useState<{
@@ -290,7 +293,11 @@ export function DocumentUpload({ chatId, onUploadComplete }: DocumentUploadProps
   );
 
   // Poll document status while processing
-  const { data: docStatus } = useDocumentStatus(uploadState.documentId || '');
+  const {
+    data: docStatus,
+    isError: isDocumentStatusError,
+    error: documentStatusError,
+  } = useDocumentStatus(uploadState.documentId || '');
 
   // Check ingestion lifecycle updates
   useEffect(() => {
@@ -317,6 +324,25 @@ export function DocumentUpload({ chatId, onUploadComplete }: DocumentUploadProps
       toast.error(failureMessage);
     }
   }, [docStatus, onUploadComplete, uploadState.documentId, uploadState.status]);
+
+  useEffect(() => {
+    if (!isDocumentStatusError || uploadState.status !== 'processing') return;
+
+    const statusCode = (documentStatusError as any)?.response?.status;
+    if (statusCode !== 404) return;
+
+    setUploadState((prev) => ({
+      ...prev,
+      status: 'error',
+      error: OCR_NOT_SUPPORTED_MESSAGE,
+      documentId: undefined,
+      progress: 0,
+    }));
+
+    queryClient.invalidateQueries({ queryKey: ['chat', chatId] });
+    queryClient.invalidateQueries({ queryKey: ['documents'] });
+    toast.error(OCR_NOT_SUPPORTED_MESSAGE);
+  }, [chatId, documentStatusError, isDocumentStatusError, queryClient, uploadState.status]);
 
   const handleRetryIngestion = useCallback(async () => {
     if (!uploadState.documentId) return;

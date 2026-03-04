@@ -8,7 +8,7 @@ import IngestionError from "../utils/ingestionError.js"
 import { IngestionStep } from "../generated/prisma/client.js"
 import IngestionResponse from "../utils/ingestionResponse.js"
 
-const SCANNED_PDF_ERROR_MESSAGE =
+export const SCANNED_PDF_ERROR_MESSAGE =
     "No extractable text found in this PDF. It appears to be a scanned/image-only file. OCR is not supported yet, so please upload a text-based PDF.";
 
 const hasMeaningfulExtractedText = (text: string): boolean => {

@@ -112,7 +112,10 @@ api.interceptors.response.use(
           
         case 404:
           // Not Found
-          toast.error('Resource not found.');
+          // Document status may return 404 when backend auto-cleans invalid docs.
+          if (!error.config?.url?.includes('/document/status/')) {
+            toast.error('Resource not found.');
+          }
           break;
           
         case 429:
