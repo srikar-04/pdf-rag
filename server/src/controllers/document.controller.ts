@@ -308,10 +308,31 @@ export const getAllDocuments = asyncHandler(async (req: Request, res: Response, 
             documentStatus: true,
             ingestionStep: true,
             documentHash: true,
+            documentMetadata: {
+                select: {
+                    createdAt: true,
+                },
+            },
         },
     });
 
-    res.json(new ApiResponse(200, documents, "Documents fetched successfully"));
+    const normalizedDocuments = documents
+        .map((doc) => ({
+            id: doc.id,
+            documentName: doc.documentName,
+            storagePath: doc.storagePath,
+            documentStatus: doc.documentStatus,
+            ingestionStep: doc.ingestionStep,
+            documentHash: doc.documentHash,
+            createdAt: doc.documentMetadata?.createdAt,
+        }))
+        .sort((a, b) => {
+            const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            return bTime - aTime;
+        });
+
+    res.json(new ApiResponse(200, normalizedDocuments, "Documents fetched successfully"));
 })
 
 

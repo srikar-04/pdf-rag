@@ -68,6 +68,13 @@ export default function Dashboard() {
     },
   ];
 
+  const getRelativeTime = (value?: string) => {
+    if (!value) return 'upload time unavailable';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'upload time unavailable';
+    return formatDistanceToNow(date, { addSuffix: true });
+  };
+
   return (
     <div className="space-y-8 animate-fade-in">
       {/* ============================================
@@ -272,7 +279,7 @@ export default function Dashboard() {
                       </p>
                       <p className="text-xs text-white/40 flex items-center gap-1">
                         <Clock className="w-3 h-3" />
-                        {formatDistanceToNow(new Date(doc.createdAt || Date.now()), { addSuffix: true })}
+                        {getRelativeTime(doc.createdAt)}
                       </p>
                     </div>
                     {/* Status indicator */}
