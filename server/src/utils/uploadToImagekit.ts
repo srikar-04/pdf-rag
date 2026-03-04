@@ -3,6 +3,8 @@ import ApiError from "./apiError.js"
 import fs from 'fs'
 import { prisma } from "../lib/prisma.js"
 
+const IMAGEKIT_UPLOAD_TIMEOUT_MS = 90_000;
+
 export const deleteLocalFile = (file: Express.Multer.File) => {
     fs.unlink(file.path, (err) => {
         if(err) console.log('error deleting local file, in imagekit upload handler : ', err)
@@ -46,10 +48,33 @@ export const uploadToImagekit = async (file: Express.Multer.File, fileHash: stri
 
     const fileName = file?.filename
 
-    const response = await client.files.upload({
-        file: fs.createReadStream(file.path),
-        fileName: fileName
-    })
+    try {
+        const response = await new Promise<any>((resolve, reject) => {
+            const timer = setTimeout(() => {
+                reject(new ApiError(504, 'Image upload timed out. Please retry.'));
+            }, IMAGEKIT_UPLOAD_TIMEOUT_MS);
 
-    return response
+            client.files.upload({
+                file: fs.createReadStream(file.path),
+                fileName: fileName
+            })
+            .then((result) => {
+                clearTimeout(timer);
+                resolve(result);
+            })
+            .catch((err) => {
+                clearTimeout(timer);
+                reject(err);
+            });
+        });
+
+        return response
+    } catch (error: any) {
+        if (error instanceof ApiError) {
+            throw error;
+        }
+
+        console.error('imagekit upload failed:', error);
+        throw new ApiError(502, 'Upload service is temporarily unavailable. Please try again.');
+    }
 }

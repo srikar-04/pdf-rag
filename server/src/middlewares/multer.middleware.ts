@@ -2,13 +2,19 @@ import type { Request } from 'express'
 import multer from 'multer'
 import crypto from 'crypto'
 import path from 'path'
+import fs from 'fs'
+
+const TEMP_UPLOAD_DIR = path.join(process.cwd(), 'public', 'temp');
 
 const storage = multer.diskStorage({
 
     // first argument in both cb functions are error arguments
     
     destination: function(req, file, cb) {
-        cb(null, './public/temp')
+        if (!fs.existsSync(TEMP_UPLOAD_DIR)) {
+            fs.mkdirSync(TEMP_UPLOAD_DIR, { recursive: true });
+        }
+        cb(null, TEMP_UPLOAD_DIR)
     },
 
     filename: function(req: Request, file: Express.Multer.File, cb) {

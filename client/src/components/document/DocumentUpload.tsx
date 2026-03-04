@@ -67,13 +67,17 @@ const getErrorMessage = (error: any): string => {
     return 'Upload timed out before server completed processing. Please retry.';
   }
 
+  if (error?.code === 'ERR_NETWORK') {
+    return 'Could not reach upload service. Check backend availability and CORS settings, then retry.';
+  }
+
   return data?.message || error?.message || 'Upload failed';
 };
 
 const isRetriableError = (error: any): boolean => {
   if (!error?.response) return true;
   const status = error.response.status;
-  return status === 408 || status === 409 || status === 429 || status >= 500;
+  return status === 408 || status === 409 || status >= 500;
 };
 
 const isOcrUnsupportedMessage = (message?: string): boolean =>

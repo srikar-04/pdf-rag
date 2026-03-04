@@ -153,6 +153,8 @@ api.interceptors.response.use(
       // Request made but no response (network error)
       if ((error as { code?: string }).code === 'ECONNABORTED') {
         toast.error('Request timed out. Server is taking longer than expected.');
+      } else if ((error as { code?: string }).code === 'ERR_NETWORK') {
+        toast.error('Cannot reach backend service. Please verify server is running and reachable.');
       } else {
         toast.error('Network error. Please check your connection.');
       }
