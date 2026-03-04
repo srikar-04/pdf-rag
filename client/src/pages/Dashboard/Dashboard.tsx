@@ -157,13 +157,6 @@ export default function Dashboard() {
               <MessageSquare className="w-4 h-4 text-indigo-400" />
               Recent Chats
             </h2>
-            <Link 
-              to="/dashboard" 
-              className="text-sm text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
-            >
-              View all
-              <ArrowRight className="w-3 h-3" />
-            </Link>
           </div>
 
           <div className="p-2">

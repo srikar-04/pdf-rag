@@ -131,7 +131,7 @@ export function UploadDropzone({
           <p className="text-sm text-white/50">
             {isUploading 
               ? `${Math.round(uploadProgress)}% complete`
-              : 'or click to browse (max 10MB)'
+              : 'or click to browse (max 15MB)'
             }
           </p>
         </div>

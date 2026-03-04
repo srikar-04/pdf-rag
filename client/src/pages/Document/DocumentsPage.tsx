@@ -183,7 +183,7 @@ export default function DocumentsPage() {
           <CardContent className="p-6">
             <h2 className="text-lg font-medium text-white mb-4">Upload New Document</h2>
             <p className="text-sm text-white/50 mb-4">
-              Upload a PDF file to chat with. Maximum file size: 10MB
+              Upload a PDF file to chat with. Maximum file size: 15MB
             </p>
             {uploading ? (
               <div className="flex items-center justify-center py-8">
