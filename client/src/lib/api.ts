@@ -197,6 +197,8 @@ export const apiEndpoints = {
     list: () => api.get('/chat'),
     create: (data: { title: string }) => api.post('/chat/create-chat', { chatName: data.title }),
     get: (chatId: string) => api.get(`/chat/${chatId}`),
+    update: (chatId: string, data: { title: string }) =>
+      api.patch(`/chat/${chatId}`, { chatName: data.title }),
     delete: (chatId: string) => api.delete(`/chat/${chatId}`),
   },
   

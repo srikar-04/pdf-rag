@@ -51,6 +51,7 @@ export default function DocumentsPage() {
   const [uploading, setUploading] = useState(false);
   const [useInChatOpen, setUseInChatOpen] = useState(false);
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
+  const [documentToDeleteId, setDocumentToDeleteId] = useState<string | null>(null);
   const [newChatName, setNewChatName] = useState('');
   const [showNewChatForm, setShowNewChatForm] = useState(false);
 
@@ -131,18 +132,19 @@ export default function DocumentsPage() {
   };
 
   // Handle document deletion
-  const handleDeleteDocument = async (docId: string) => {
-    // Show warning toast and proceed with delete
-    toast.warning('Deleting document...', {
-      description: 'This action cannot be undone.',
-      duration: 3000,
-    });
-    
+  const handleDeleteDocument = (docId: string) => {
+    setDocumentToDeleteId(docId);
+  };
+
+  const confirmDeleteDocument = async () => {
+    if (!documentToDeleteId) return;
     try {
-      await deleteDocumentMutation.mutateAsync(docId);
+      await deleteDocumentMutation.mutateAsync(documentToDeleteId);
       toast.success('Document deleted');
     } catch (error) {
       toast.error('Failed to delete document');
+    } finally {
+      setDocumentToDeleteId(null);
     }
   };
 
@@ -380,6 +382,29 @@ export default function DocumentsPage() {
           <DialogFooter>
             <Button variant="ghost" onClick={() => handleCloseUseInChat(false)}>
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!documentToDeleteId} onOpenChange={(open) => !open && setDocumentToDeleteId(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Document?</DialogTitle>
+            <DialogDescription>
+              This removes the document from your account and linked chats.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDocumentToDeleteId(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onClick={confirmDeleteDocument}
+              isLoading={deleteDocumentMutation.isPending}
+            >
+              Delete Document
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -52,12 +52,14 @@ export default function ChatPage() {
     linkedDocuments.find((doc) => doc.id === activeDocumentId) ||
     linkedDocuments[linkedDocuments.length - 1];
   const documentId = selectedDocument?.id;
+  const messageDocumentScopeId = linkedDocuments.length > 1 ? 'all' : documentId;
   const { data: polledDocumentStatus, isError: documentStatusError, error: documentStatusQueryError } = useDocumentStatus(documentId || '');
 
   const effectiveDocumentStatus = polledDocumentStatus?.documentStatus || selectedDocument?.documentStatus;
   const effectiveIngestionStep = (polledDocumentStatus?.ingestionStep || selectedDocument?.ingestionStep || 'none') as IngestionStep;
   const failureReason = polledDocumentStatus?.failureReason;
   const isDocumentReady = effectiveDocumentStatus === 'ready';
+  const hasAnyReadyDocument = linkedDocuments.some((doc) => doc.documentStatus === 'ready') || isDocumentReady;
   const isDocProcessing =
     effectiveDocumentStatus === 'processing' || effectiveDocumentStatus === 'Ingesting';
   const shouldShowFailureCard = effectiveDocumentStatus === 'failed' || !!runtimeIngestionError;
@@ -243,8 +245,8 @@ export default function ChatPage() {
       return;
     }
 
-    if (!isDocumentReady) {
-      toast.error('Document is still processing. Please wait until it is ready.');
+    if (!hasAnyReadyDocument) {
+      toast.error('No ready documents in this chat yet. Please wait for ingestion to complete.');
       return;
     }
 
@@ -254,7 +256,7 @@ export default function ChatPage() {
     try {
       await sendMessageMutation.mutateAsync({
         chatId,
-        documentId,
+        documentId: messageDocumentScopeId || documentId,
         query: content,
       });
     } catch (error) {
@@ -359,6 +361,11 @@ export default function ChatPage() {
             <p className="text-xs font-medium text-white/60 mb-2">
               Linked documents ({linkedDocuments.length})
             </p>
+            {linkedDocuments.length > 1 && (
+              <p className="text-[11px] text-white/45 mb-2">
+                Queries use all ready linked documents. Choose one below to view its status.
+              </p>
+            )}
             <div className="flex flex-wrap gap-2">
               {linkedDocuments.map((doc) => {
                 const isActive = doc.id === documentId;
@@ -524,7 +531,7 @@ export default function ChatPage() {
       <ChatInput
         onSend={handleSendMessage}
         isLoading={isStreaming || sendMessageMutation.isPending}
-        disabled={sendMessageMutation.isPending || !isDocumentReady}
+        disabled={sendMessageMutation.isPending || !hasAnyReadyDocument}
         chatId={chatId}
       />
 

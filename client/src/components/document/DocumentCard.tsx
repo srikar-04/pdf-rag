@@ -120,7 +120,7 @@ export function DocumentCard({ document, onDelete, onSelect }: DocumentCardProps
               className={cn(
                 'p-2 rounded-lg transition-colors',
                 'text-white/40 hover:text-white hover:bg-white/10',
-                'opacity-0 group-hover:opacity-100'
+                'opacity-100 md:opacity-0 md:group-hover:opacity-100'
               )}
             >
               <MoreVertical className="w-4 h-4" />

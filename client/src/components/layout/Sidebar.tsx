@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useChats, useDeleteChat } from '../../hooks';
-import { Button } from '../ui';
+import { useChats, useDeleteChat, useUpdateChat } from '../../hooks';
+import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui';
 import { ChatNameDialog } from '../chat/ChatNameDialog';
 import { 
   FileText, 
@@ -8,7 +8,8 @@ import {
   Plus, 
   Search,
   Bot,
-  Trash2
+  Trash2,
+  Pencil
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '../../lib/utils';
@@ -39,8 +40,12 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   const navigate = useNavigate();
   const { data: chats, isLoading } = useChats();
   const deleteChatMutation = useDeleteChat();
+  const updateChatMutation = useUpdateChat();
   const [searchQuery, setSearchQuery] = useState('');
   const [isChatDialogOpen, setIsChatDialogOpen] = useState(false);
+  const [chatToDeleteId, setChatToDeleteId] = useState<string | null>(null);
+  const [editingChat, setEditingChat] = useState<{ id: string; title: string } | null>(null);
+  const [editedChatName, setEditedChatName] = useState('');
 
   // Navigation items
   const navItems = [
@@ -70,25 +75,54 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   };
 
   // Handle delete chat
-  const handleDeleteChat = async (e: React.MouseEvent, chatId: string) => {
+  const handleDeleteChat = (e: React.MouseEvent, chatId: string) => {
     e.preventDefault();
     e.stopPropagation();
-    
-    // Show warning and proceed with delete (no browser confirm)
-    toast.warning('Deleting chat...', {
-      description: 'This action cannot be undone.',
-      duration: 3000,
-    });
-    
+    setChatToDeleteId(chatId);
+  };
+
+  const confirmDeleteChat = async () => {
+    if (!chatToDeleteId) return;
     try {
-      await deleteChatMutation.mutateAsync(chatId);
+      await deleteChatMutation.mutateAsync(chatToDeleteId);
       toast.success('Chat deleted');
       // If we're on the deleted chat, redirect to dashboard
-      if (location.pathname === `/chat/${chatId}`) {
+      if (location.pathname === `/chat/${chatToDeleteId}`) {
         navigate('/dashboard');
       }
     } catch (error) {
       toast.error('Failed to delete chat');
+    } finally {
+      setChatToDeleteId(null);
+    }
+  };
+
+  const handleOpenEditChat = (e: React.MouseEvent, chatId: string, title: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setEditingChat({ id: chatId, title });
+    setEditedChatName(title);
+  };
+
+  const handleUpdateChat = async () => {
+    if (!editingChat) return;
+
+    const trimmed = editedChatName.trim();
+    if (trimmed.length < 3) {
+      toast.error('Chat name must be at least 3 characters');
+      return;
+    }
+
+    try {
+      await updateChatMutation.mutateAsync({
+        chatId: editingChat.id,
+        title: trimmed,
+      });
+      toast.success('Chat name updated');
+      setEditingChat(null);
+      setEditedChatName('');
+    } catch (error) {
+      toast.error('Failed to update chat name');
     }
   };
 
@@ -206,14 +240,23 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
                       <span className="truncate flex-1">
                         {chat.title}
                       </span>
-                      {/* Delete button (visible on hover) */}
-                      <button
-                        className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 p-1 rounded hover:bg-red-500/10 text-white/40 hover:text-red-400 transition-all"
-                        onClick={(e) => handleDeleteChat(e, chat.id)}
-                        aria-label="Delete chat"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 p-1 rounded hover:bg-indigo-500/10 text-white/40 hover:text-indigo-300 transition-all"
+                          onClick={(e) => handleOpenEditChat(e, chat.id, chat.title)}
+                          aria-label="Edit chat name"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        {/* Delete button (visible on hover) */}
+                        <button
+                          className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 p-1 rounded hover:bg-red-500/10 text-white/40 hover:text-red-400 transition-all"
+                          onClick={(e) => handleDeleteChat(e, chat.id)}
+                          aria-label="Delete chat"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </Link>
                   ))}
                 </div>
@@ -236,6 +279,64 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
         open={isChatDialogOpen} 
         onOpenChange={setIsChatDialogOpen} 
       />
+
+      <Dialog open={!!chatToDeleteId} onOpenChange={(open) => !open && setChatToDeleteId(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Chat?</DialogTitle>
+            <DialogDescription>
+              This will permanently delete this chat and all its messages.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setChatToDeleteId(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onClick={confirmDeleteChat}
+              isLoading={deleteChatMutation.isPending}
+            >
+              Delete Chat
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editingChat} onOpenChange={(open) => !open && setEditingChat(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Chat Name</DialogTitle>
+            <DialogDescription>
+              Rename this chat for easier tracking.
+            </DialogDescription>
+          </DialogHeader>
+          <input
+            value={editedChatName}
+            onChange={(e) => setEditedChatName(e.target.value)}
+            placeholder="Chat name"
+            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+          />
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setEditingChat(null);
+                setEditedChatName('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleUpdateChat}
+              isLoading={updateChatMutation.isPending}
+            >
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

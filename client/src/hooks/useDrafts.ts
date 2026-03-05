@@ -65,8 +65,39 @@ export function useDrafts(chatId: string | undefined) {
 
   // Update draft
   const updateDraft = useCallback((value: string) => {
-    setDraft(value);
-  }, []);
+    if (!chatId) return;
+
+    const key = getStorageKey();
+    if (!key) return;
+
+    const normalized = value ?? '';
+    if (normalized.trim().length === 0) {
+      // Keep previously saved draft recoverable when user clears textarea.
+      setHasDraft(Boolean(localStorage.getItem(key)));
+      return;
+    }
+
+    setDraft(normalized);
+  }, [chatId, getStorageKey]);
+
+  // Restore previously saved draft value from storage.
+  const restoreDraft = useCallback(() => {
+    if (!chatId) return '';
+    const key = getStorageKey();
+    if (!key) return '';
+
+    try {
+      const saved = localStorage.getItem(key) || '';
+      if (saved) {
+        setDraft(saved);
+        setHasDraft(true);
+      }
+      return saved;
+    } catch (error) {
+      console.error('Failed to restore draft:', error);
+      return '';
+    }
+  }, [chatId, getStorageKey]);
 
   // Clear draft after message is sent
   const clearDraft = useCallback(() => {
@@ -114,6 +145,7 @@ export function useDrafts(chatId: string | undefined) {
     draft,
     hasDraft,
     updateDraft,
+    restoreDraft,
     clearDraft,
   };
 }

@@ -37,7 +37,7 @@ export function ChatInput({
   onSend, 
   isLoading = false, 
   disabled = false,
-  placeholder = 'Ask a question about your document...',
+  placeholder = 'Ask about your linked documents...',
   chatId
 }: ChatInputProps) {
   const [message, setMessage] = useState('');
@@ -45,7 +45,7 @@ export function ChatInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   
   // Auto-save drafts
-  const { draft: savedDraft, hasDraft, updateDraft, clearDraft } = useDrafts(chatId);
+  const { draft: savedDraft, hasDraft, updateDraft, restoreDraft, clearDraft } = useDrafts(chatId);
 
   // Restore draft on mount (only once)
   useEffect(() => {
@@ -114,8 +114,8 @@ export function ChatInput({
             <span>You have an unsaved draft</span>
             <button 
               onClick={() => {
-                setMessage(savedDraft);
-                clearDraft();
+                const restored = restoreDraft() || savedDraft;
+                setMessage(restored);
               }}
               className="hover:text-amber-400 underline"
             >
@@ -141,7 +141,9 @@ export function ChatInput({
             rows={1}
             className={cn(
               'flex-1 bg-transparent resize-none',
+              'min-w-0 overflow-x-hidden break-words',
               'placeholder:text-white/30',
+              'placeholder:text-xs sm:placeholder:text-sm',
               'focus:outline-none text-sm text-white',
               'px-3 py-3 max-h-[150px] overflow-y-auto',
               'disabled:opacity-50'

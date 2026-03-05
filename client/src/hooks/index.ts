@@ -88,6 +88,28 @@ export const useCreateChat = (
   });
 };
 
+/**
+ * Hook: useUpdateChat
+ * Update an existing chat title
+ */
+export const useUpdateChat = (
+  options?: UseMutationOptions<Chat, Error, { chatId: string; title: string }>
+) => {
+  const queryClient = useQueryClient();
+
+  return useMutation<Chat, Error, { chatId: string; title: string }>({
+    mutationFn: async ({ chatId, title }) => {
+      const response = await apiEndpoints.chats.update(chatId, { title });
+      return response.data.data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['chats'] });
+      queryClient.invalidateQueries({ queryKey: ['chat', variables.chatId] });
+    },
+    ...options,
+  });
+};
+
 // ============================================================================
 // MESSAGE QUERIES
 // ============================================================================
