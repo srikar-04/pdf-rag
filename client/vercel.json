@@ -1,6 +1,14 @@
 {
   "rewrites": [
     {
+      "source": "/auth/(.*)",
+      "destination": "https://pdf-rag-vwth.onrender.com/auth/$1"
+    },
+    {
+      "source": "/api/v1/(.*)",
+      "destination": "https://pdf-rag-vwth.onrender.com/api/v1/$1"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
