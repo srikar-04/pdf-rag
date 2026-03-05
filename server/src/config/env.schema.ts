@@ -14,8 +14,10 @@ const envSchema = z.object({
   
   IMAGEKIT_PRIVATE_KEY: z.string().min(1, 'IMAGEKIT_PRIVATE_KEY is required'),
   
-  OLLAMA_BASE_URL: z.url().default('http://localhost:11434'),
-  EMBEDDING_MODEL: z.string().default('nomic-embed-text'),
+  CLOUDFLARE_ACCOUNT_ID: z.string().min(1, 'CLOUDFLARE_ACCOUNT_ID is required'),
+  CLOUDFLARE_API_TOKEN: z.string().min(1, 'CLOUDFLARE_API_TOKEN is required'),
+  CLOUDFLARE_EMBEDDING_MODEL: z.string().default('@cf/baai/bge-base-en-v1.5'),
+  EMBEDDING_VECTOR_DIMENSION: z.string().default('768').transform(Number),
   EMBEDDING_TIMEOUT_MS: z.string().default('60000').transform(Number),
    
   CORS_ORIGIN: z.url('CORS_ORIGIN must be a valid URL'),

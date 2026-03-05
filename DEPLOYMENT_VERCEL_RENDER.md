@@ -4,7 +4,7 @@ This project is configured for:
 
 - `client` (React + Vite) on **Vercel**
 - `server` (Express + Prisma + Auth.js) on **Render**
-- `OLLAMA_BASE_URL` pointing to a separate hosted Ollama service
+- embeddings on **Cloudflare Workers AI**
 
 ---
 
@@ -16,27 +16,22 @@ This project is configured for:
 4. ImageKit credentials.
 5. Google and GitHub OAuth apps.
 6. Render account and Vercel account.
+7. Cloudflare account with Workers AI enabled.
 
 ---
 
-## 2) Deploy Ollama First (Render Private Service)
+## 2) Create Cloudflare Workers AI Credentials
 
-1. Render -> `New` -> `Private Service`.
-2. Deploy from existing Docker image: `ollama/ollama`.
-3. Region: same as backend region.
-4. Port: `11434`.
-5. Attach persistent disk at `/root/.ollama`.
-6. Deploy service.
-7. Open shell for this service and run:
+1. Open Cloudflare dashboard.
+2. Copy your **Account ID** from account settings.
+3. Create an API token with Workers AI permissions.
+4. Keep these values ready:
 
-```bash
-ollama pull nomic-embed-text
-```
+- `CLOUDFLARE_ACCOUNT_ID`
+- `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_EMBEDDING_MODEL` (default: `@cf/baai/bge-base-en-v1.5`)
 
-8. Copy the private network URL from Render (example):
-   - `http://ollama-internal:11434`
-
-Use this value as backend `OLLAMA_BASE_URL`.
+No Ollama service deployment is required in this setup.
 
 ---
 
@@ -85,8 +80,10 @@ Set these in Render service settings:
 - `GEMINI_API_KEY=<...>`
 - `QDRANT_API_KEY=<...>`
 - `QDRANT_URL=<...>`
-- `OLLAMA_BASE_URL=http://<your-ollama-private-service>:11434`
-- `EMBEDDING_MODEL=nomic-embed-text`
+- `CLOUDFLARE_ACCOUNT_ID=<...>`
+- `CLOUDFLARE_API_TOKEN=<...>`
+- `CLOUDFLARE_EMBEDDING_MODEL=@cf/baai/bge-base-en-v1.5`
+- `EMBEDDING_VECTOR_DIMENSION=768`
 - `EMBEDDING_TIMEOUT_MS=60000`
 - `RATE_LIMIT_WINDOW_MS=60000`
 - `RATE_LIMIT_MAX_REQUESTS=100`

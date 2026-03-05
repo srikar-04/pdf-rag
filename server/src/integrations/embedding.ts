@@ -1,9 +1,8 @@
-import axios from 'axios';
 import pLimit from 'p-limit';
 import { IngestionStep } from '../generated/prisma/enums.js';
 import IngestionResponse from '../utils/ingestionResponse.js';
 import IngestionError from '../utils/ingestionError.js';
-import { env } from '../config/env.schema.js';
+import { generateEmbeddings } from '../lib/cloudflareEmbeddings.js';
 
 /**
  * Embedding Configuration
@@ -11,22 +10,16 @@ import { env } from '../config/env.schema.js';
  * These values determined through testing and first principles:
  * 
  * CONCURRENCY_LIMIT = 5
- * - Ollama is CPU-bound for embedding generation
+ * - Cloudflare Workers AI calls are network-bound
  * - Too high: Context switching overhead, memory pressure
  * - Too low: Underutilization, slow throughput
- * - 5 allows parallel processing without overwhelming local Ollama
+ * - 5 keeps outbound requests stable and predictable
  * 
  * BATCH_SIZE = 10
  * - Larger batches = better throughput
  * - But: If one chunk fails, retry whole batch
  * - 10 chunks ≈ 8KB-80KB text (800 chars each)
  * - Balances throughput with failure granularity
- * 
- * CHUNK_TIMEOUT_MS = 30000
- * - Ollama nomic-embed-text: ~500ms-2000ms per chunk
- * - 30s = 15x headroom for slow chunks
- * - Prevents indefinite hangs
- * - Long enough for worst-case scenarios
  * 
  * MAX_RETRIES = 3
  * - Transient failures (network blips) recover quickly
@@ -35,7 +28,6 @@ import { env } from '../config/env.schema.js';
  */
 const CONCURRENCY_LIMIT = 5;
 const BATCH_SIZE = 10;
-const CHUNK_TIMEOUT_MS = 30000; // 30 seconds per chunk
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
 
@@ -61,27 +53,15 @@ const embedChunkWithRetry = async (
   
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const response = await axios.post(
-        `${env.OLLAMA_BASE_URL}/api/embeddings`,
-        {
-          model: env.EMBEDDING_MODEL,
-          prompt: chunk,
-        },
-        { 
-          timeout: CHUNK_TIMEOUT_MS,
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-      
-      if (!response.data?.embedding) {
-        throw new Error('Empty embedding response from Ollama');
+      const [embedding] = await generateEmbeddings(chunk);
+
+      if (!embedding) {
+        throw new Error('Empty embedding response from Cloudflare Workers AI');
       }
       
       return {
         index: chunkIndex,
-        embedding: response.data.embedding,
+        embedding,
       };
       
     } catch (error) {

@@ -13,6 +13,17 @@ import { ChatCreateSchema } from "../schemas/chat.schema.js";
 
 const SCANNED_PDF_FAILURE_REASON =
     "No extractable text was found. This looks like a scanned/image-only PDF. OCR is not supported yet, so please upload a text-based PDF.";
+const EMBEDDING_FAILURE_REASON =
+    "Document embedding failed due to a server configuration issue (vector dimension mismatch). Please retry in a few minutes.";
+const GENERIC_PIPELINE_FAILURE_REASON =
+    "Document processing failed due to a temporary server issue. Please retry your upload.";
+
+const getFailureReason = (status: string, step: string) => {
+    if (status !== "failed") return undefined;
+    if (step === "fetched") return SCANNED_PDF_FAILURE_REASON;
+    if (step === "embedded") return EMBEDDING_FAILURE_REASON;
+    return GENERIC_PIPELINE_FAILURE_REASON;
+};
 
 
 export const documentUpload = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
@@ -264,10 +275,7 @@ export const documentStatus = asyncHandler(async (req: Request, res: Response, n
         throw new ApiError(404, 'user id does not match in doc status handler')
     }
 
-    const failureReason =
-        docDB.documentStatus === "failed" && docDB.ingestionStep === "fetched"
-            ? SCANNED_PDF_FAILURE_REASON
-            : undefined;
+    const failureReason = getFailureReason(docDB.documentStatus, docDB.ingestionStep);
 
     res.json(
         new ApiResponse(

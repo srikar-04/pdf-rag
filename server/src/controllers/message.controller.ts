@@ -2,13 +2,12 @@ import type { Request, Response, NextFunction } from "express";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import ApiError from "../utils/apiError.js";
 import { prisma } from "../lib/prisma.js";
-import axios from "axios";
 import { queryRetrieval, type RetrievalResponse } from "../helpers/retrieval.js";
 import { geminiClient } from "../lib/gemini.js";
-import { env } from "../config/env.schema.js";
 import type { ChatCompletionMessageParam } from "openai/resources/index.mjs";
 import ApiResponse from "../utils/apiResponse.js";
 import type { Role } from "../generated/prisma/enums.js";
+import { generateEmbeddings } from "../lib/cloudflareEmbeddings.js";
 
 
 // type MessagesType = ChatCompletionMessageParam[] extends {role: Role, content: any}
@@ -133,11 +132,8 @@ export const query = asyncHandler(async (req: Request, res: Response, next: Next
 
     // 2) embed query AND fetch chat history in parallel (independent operations)
     const [queryEmbeddings, lastMessages] = await Promise.all([
-        // Embed query using Ollama
-        axios.post(`${env.OLLAMA_BASE_URL}/api/embeddings`, {
-            model: env.EMBEDDING_MODEL,
-            prompt: query,
-        }, { timeout: 30000 }),
+        // Embed query using Cloudflare Workers AI
+        generateEmbeddings(query),
         
         // Fetch chat history (already in chronological order)
         prisma.message.findMany({
@@ -147,12 +143,14 @@ export const query = asyncHandler(async (req: Request, res: Response, next: Next
         }),
     ]);
 
-    if (!queryEmbeddings.data) throw new ApiError(400, 'unable to embed user query')
+    if (!queryEmbeddings || queryEmbeddings.length === 0 || !queryEmbeddings[0]) {
+        throw new ApiError(400, 'unable to embed user query')
+    }
 
     console.log(`☑️ embedded user query and fetched chat history (parallel)\n`)
 
     let userId = user.id
-    let embeddings = queryEmbeddings.data.embedding as number[]
+    let embeddings = queryEmbeddings[0]
 
     // 3) send embedded query to retrieval function
     const retrievalResponse: RetrievalResponse = await queryRetrieval({ embeddings, userId, documentId })

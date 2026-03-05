@@ -326,7 +326,7 @@ export function DocumentUpload({
     if (docStatus.documentStatus === 'failed' && uploadState.status !== 'error') {
       const failureMessage =
         docStatus.failureReason ||
-        'Document ingestion failed. Please upload a text-based PDF and try again.';
+        'Document ingestion failed due to a server issue. Please retry in a few minutes.';
 
       setUploadState(prev => ({
         ...prev,

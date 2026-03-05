@@ -337,7 +337,7 @@ export default function ChatPage() {
                   Document ingestion failed
                 </p>
                 <p className="text-sm text-red-100 mt-1 leading-6">
-                  {failureReason || 'This PDF could not be processed. Please upload a different text-based PDF.'}
+                  {failureReason || 'Document processing failed due to a server issue. Please retry the upload in a few minutes.'}
                 </p>
                 <div className="mt-3">
                   <Button
