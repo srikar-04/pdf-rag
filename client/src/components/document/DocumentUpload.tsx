@@ -341,19 +341,31 @@ export function DocumentUpload({
     if (!isDocumentStatusError || uploadState.status !== 'processing') return;
 
     const statusCode = (documentStatusError as any)?.response?.status;
-    if (statusCode !== 404) return;
+    if (statusCode === 404) {
+      setUploadState((prev) => ({
+        ...prev,
+        status: 'error',
+        error: OCR_NOT_SUPPORTED_MESSAGE,
+        documentId: undefined,
+        progress: 0,
+      }));
+
+      queryClient.invalidateQueries({ queryKey: ['chat', chatId] });
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+      toast.error(OCR_NOT_SUPPORTED_MESSAGE);
+      return;
+    }
+
+    const runtimeFailureMessage =
+      'Document processing failed because backend polling was interrupted. Please restart backend and retry ingestion.';
 
     setUploadState((prev) => ({
       ...prev,
       status: 'error',
-      error: OCR_NOT_SUPPORTED_MESSAGE,
-      documentId: undefined,
+      error: runtimeFailureMessage,
       progress: 0,
     }));
-
-    queryClient.invalidateQueries({ queryKey: ['chat', chatId] });
-    queryClient.invalidateQueries({ queryKey: ['documents'] });
-    toast.error(OCR_NOT_SUPPORTED_MESSAGE);
+    toast.error(runtimeFailureMessage);
   }, [chatId, documentStatusError, isDocumentStatusError, queryClient, uploadState.status]);
 
   const handleRetryIngestion = useCallback(async () => {

@@ -34,8 +34,10 @@ export default function ChatPage() {
   const [isPageDragActive, setIsPageDragActive] = useState(false);
   const [queuedUploadFile, setQueuedUploadFile] = useState<File | null>(null);
   const [uploadFailureNotice, setUploadFailureNotice] = useState<string | null>(null);
+  const [runtimeIngestionError, setRuntimeIngestionError] = useState<string | null>(null);
   const hasShownFailureToastRef = useRef(false);
   const wasDocumentReadyRef = useRef(false);
+  const previousDocumentIdRef = useRef<string | undefined>(undefined);
   const dragDepthRef = useRef(0);
   const queryClient = useQueryClient();
 
@@ -53,6 +55,13 @@ export default function ChatPage() {
   const effectiveIngestionStep = (polledDocumentStatus?.ingestionStep || selectedDocument?.ingestionStep || 'none') as IngestionStep;
   const failureReason = polledDocumentStatus?.failureReason;
   const isDocumentReady = effectiveDocumentStatus === 'ready';
+  const isDocProcessing =
+    effectiveDocumentStatus === 'processing' || effectiveDocumentStatus === 'Ingesting';
+  const shouldShowFailureCard = effectiveDocumentStatus === 'failed' || !!runtimeIngestionError;
+  const failureMessageForUI =
+    failureReason ||
+    runtimeIngestionError ||
+    'Document processing failed due to a server issue. Please retry the upload in a few minutes.';
 
   const consumeQueuedUploadFile = useCallback(() => {
     setQueuedUploadFile(null);
@@ -126,6 +135,14 @@ export default function ChatPage() {
   }, [isDocumentReady, showUpload]);
 
   useEffect(() => {
+    const previousDocumentId = previousDocumentIdRef.current;
+    if (!previousDocumentId && documentId && showUpload) {
+      setShowUpload(false);
+    }
+    previousDocumentIdRef.current = documentId;
+  }, [documentId, showUpload]);
+
+  useEffect(() => {
     if (!chatId) return;
     if (effectiveDocumentStatus !== 'ready' && effectiveDocumentStatus !== 'failed') return;
 
@@ -136,25 +153,45 @@ export default function ChatPage() {
   useEffect(() => {
     if (!chatId || !documentStatusError) return;
     const statusCode = (documentStatusQueryError as any)?.response?.status;
-    if (statusCode !== 404) return;
+    if (statusCode === 404) {
+      const failureMessage =
+        'Upload failed because this PDF appears scanned/image-only. OCR is not supported yet. Please upload a text-based PDF.';
+
+      setShowUpload(false);
+      setUploadFailureNotice(failureMessage);
+      setRuntimeIngestionError(null);
+      if (!hasShownFailureToastRef.current) {
+        toast.error(failureMessage);
+        hasShownFailureToastRef.current = true;
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['chat', chatId] });
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+      return;
+    }
+
+    if (!isDocProcessing) return;
 
     const failureMessage =
-      'Upload failed because this PDF appears scanned/image-only. OCR is not supported yet. Please upload a text-based PDF.';
+      'Document processing failed because the backend became unreachable during ingestion. Please restart the backend and upload again.';
+    setRuntimeIngestionError(failureMessage);
 
-    setShowUpload(false);
-    setUploadFailureNotice(failureMessage);
     if (!hasShownFailureToastRef.current) {
       toast.error(failureMessage);
       hasShownFailureToastRef.current = true;
     }
+  }, [chatId, documentStatusError, documentStatusQueryError, isDocProcessing, queryClient]);
 
-    queryClient.invalidateQueries({ queryKey: ['chat', chatId] });
-    queryClient.invalidateQueries({ queryKey: ['documents'] });
-  }, [chatId, documentStatusError, documentStatusQueryError, queryClient]);
+  useEffect(() => {
+    if (isDocumentReady || effectiveDocumentStatus === 'failed') {
+      setRuntimeIngestionError(null);
+    }
+  }, [effectiveDocumentStatus, isDocumentReady]);
 
   useEffect(() => {
     if (!documentId) return;
     setUploadFailureNotice(null);
+    setRuntimeIngestionError(null);
     hasShownFailureToastRef.current = false;
   }, [documentId]);
 
@@ -325,7 +362,7 @@ export default function ChatPage() {
       </div>
 
       {/* Chat Input */}
-      {effectiveDocumentStatus === 'failed' && (
+      {shouldShowFailureCard && (
         <div className="px-4 pb-3">
           <div className="rounded-lg border border-red-500/40 bg-red-500/15 p-4">
             <div className="flex items-start gap-3">
@@ -337,7 +374,7 @@ export default function ChatPage() {
                   Document ingestion failed
                 </p>
                 <p className="text-sm text-red-100 mt-1 leading-6">
-                  {failureReason || 'Document processing failed due to a server issue. Please retry the upload in a few minutes.'}
+                  {failureMessageForUI}
                 </p>
                 <div className="mt-3">
                   <Button
@@ -356,7 +393,7 @@ export default function ChatPage() {
         </div>
       )}
 
-      {!isDocumentReady && effectiveDocumentStatus !== 'failed' && (
+      {!isDocumentReady && !shouldShowFailureCard && (
         <div className="px-4 pb-3">
           <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3">
             <p className="text-xs font-medium text-amber-300 mb-3">
