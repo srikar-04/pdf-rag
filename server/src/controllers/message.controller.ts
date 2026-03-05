@@ -84,7 +84,7 @@ export const query = asyncHandler(async (req: Request, res: Response, next: Next
     }
 
     if (documentDB.userId !== user.id) {
-        throw new ApiError(401, "Unauthorized document access")
+        throw new ApiError(403, "Unauthorized document access")
     }
 
     if (documentDB.documentStatus !== "ready") {
@@ -112,7 +112,7 @@ export const query = asyncHandler(async (req: Request, res: Response, next: Next
     })
 
     if (chatDB?.userId !== user.id) {
-        throw new ApiError(401, "chat user id did not match, un authenticated user")
+        throw new ApiError(403, "chat user id did not match, un authenticated user")
     }
 
     // 1) store query in database along with chatId and role as user
