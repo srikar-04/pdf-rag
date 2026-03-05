@@ -97,12 +97,24 @@ api.interceptors.response.use(
           break;
           
         case 401:
-          // Unauthorized - session expired or not logged in
-          toast.error('Session expired. Please sign in again.');
-          // Redirect to login after short delay
-          setTimeout(() => {
-            window.location.href = '/auth/signin';
-          }, 2000);
+          // Unauthorized can mean either:
+          // 1) real session expiry (should redirect), or
+          // 2) business auth checks (should NOT force redirect).
+          {
+            const normalizedMessage = String(message || '').toLowerCase();
+            const shouldRedirectToSignin =
+              normalizedMessage.includes('session not found') ||
+              normalizedMessage.includes('session expired');
+
+            if (shouldRedirectToSignin) {
+              toast.error('Session expired. Please sign in again.');
+              setTimeout(() => {
+                window.location.href = '/auth/signin';
+              }, 2000);
+            } else {
+              toast.error(message || 'Unauthorized request.');
+            }
+          }
           break;
           
         case 403:
@@ -210,9 +222,7 @@ export const apiEndpoints = {
       const formData = new FormData();
       formData.append('file', file);
       return api.post(`/document/upload/${chatId}`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+        // Let the browser set multipart boundary automatically.
         timeout: 120000,
       });
     },
