@@ -14,18 +14,19 @@ export function Onboarding() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const normalizedUsername = username.trim();
     
-    if (!username.trim()) {
+    if (!normalizedUsername) {
       setError('Username is required');
       return;
     }
 
-    if (username.length < 3) {
+    if (normalizedUsername.length < 3) {
       setError('Username must be at least 3 characters');
       return;
     }
 
-    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+    if (!/^[a-zA-Z0-9_]+$/.test(normalizedUsername)) {
       setError('Username can only contain letters, numbers, and underscores');
       return;
     }
@@ -34,11 +35,26 @@ export function Onboarding() {
     setError('');
 
     try {
-      await registerUser(username.trim());
+      await registerUser(normalizedUsername);
       toast.success('Welcome! Your account has been created.');
       navigate('/dashboard');
     } catch (err: any) {
-      const message = err.response?.data?.message || 'Failed to register. Please try again.';
+      const responseData = err?.response?.data as {
+        message?: string;
+        errors?: Array<string | { message?: string }>;
+      } | undefined;
+      const details = Array.isArray(responseData?.errors)
+        ? responseData.errors
+            .map((entry) => {
+              if (typeof entry === 'string') return entry;
+              return entry?.message || '';
+            })
+            .filter(Boolean)
+        : [];
+      const message =
+        details[0] ||
+        responseData?.message ||
+        'Failed to register. Please try again.';
       setError(message);
       toast.error(message);
     } finally {

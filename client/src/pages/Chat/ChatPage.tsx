@@ -5,10 +5,10 @@ import { DocumentUpload } from '../../components/document';
 import { useMessages, useSendMessage, useChat, useDocumentStatus } from '../../hooks';
 import { useAppStore } from '../../lib/store';
 import { Button } from '../../components/ui';
-import { FileText, AlertCircle, AlertTriangle } from 'lucide-react';
+import { FileText, AlertCircle, AlertTriangle, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
-import { cn } from '../../lib/utils';
+import { cn, getDisplayDocumentName } from '../../lib/utils';
 import type { IngestionStep } from '../../types';
 
 /**
@@ -31,6 +31,7 @@ import type { IngestionStep } from '../../types';
 export default function ChatPage() {
   const { chatId } = useParams<{ chatId: string }>();
   const [showUpload, setShowUpload] = useState(false);
+  const [activeDocumentId, setActiveDocumentId] = useState<string | undefined>(undefined);
   const [isPageDragActive, setIsPageDragActive] = useState(false);
   const [queuedUploadFile, setQueuedUploadFile] = useState<File | null>(null);
   const [uploadFailureNotice, setUploadFailureNotice] = useState<string | null>(null);
@@ -46,8 +47,10 @@ export default function ChatPage() {
   const { data: messages, isLoading: messagesLoading } = useMessages(chatId || '');
   const sendMessageMutation = useSendMessage();
 
-  // Get first document ID from chat
-  const selectedDocument = chat?.documents?.[0];
+  const linkedDocuments = useMemo(() => chat?.documents || [], [chat?.documents]);
+  const selectedDocument =
+    linkedDocuments.find((doc) => doc.id === activeDocumentId) ||
+    linkedDocuments[linkedDocuments.length - 1];
   const documentId = selectedDocument?.id;
   const { data: polledDocumentStatus, isError: documentStatusError, error: documentStatusQueryError } = useDocumentStatus(documentId || '');
 
@@ -66,6 +69,19 @@ export default function ChatPage() {
   const consumeQueuedUploadFile = useCallback(() => {
     setQueuedUploadFile(null);
   }, []);
+
+  useEffect(() => {
+    if (linkedDocuments.length === 0) {
+      setActiveDocumentId(undefined);
+      return;
+    }
+
+    const hasSelectedDocument = linkedDocuments.some((doc) => doc.id === activeDocumentId);
+    if (!hasSelectedDocument) {
+      // Default to the most recently linked document.
+      setActiveDocumentId(linkedDocuments[linkedDocuments.length - 1]?.id);
+    }
+  }, [activeDocumentId, linkedDocuments]);
 
   useEffect(() => {
     const hasFiles = (e: DragEvent) =>
@@ -294,6 +310,16 @@ export default function ChatPage() {
 
           {showUpload && (
             <div className="mt-6 w-full max-w-xl">
+              <div className="flex justify-end mb-2">
+                <button
+                  type="button"
+                  onClick={() => setShowUpload(false)}
+                  className="inline-flex items-center justify-center rounded-md border border-white/10 bg-white/5 p-1.5 text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+                  aria-label="Close upload panel"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
               <DocumentUpload
                 chatId={chatId || ''}
                 queuedFile={queuedUploadFile}
@@ -327,12 +353,60 @@ export default function ChatPage() {
 
   return (
     <div className="relative flex flex-col h-full">
+      {linkedDocuments.length > 0 && (
+        <div className="px-4 pt-3 pb-2">
+          <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+            <p className="text-xs font-medium text-white/60 mb-2">
+              Linked documents ({linkedDocuments.length})
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {linkedDocuments.map((doc) => {
+                const isActive = doc.id === documentId;
+                const statusColor =
+                  doc.documentStatus === 'ready'
+                    ? 'bg-green-400'
+                    : doc.documentStatus === 'failed'
+                    ? 'bg-red-400'
+                    : 'bg-amber-300';
+
+                return (
+                  <button
+                    key={doc.id}
+                    type="button"
+                    onClick={() => setActiveDocumentId(doc.id)}
+                    className={cn(
+                      'inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs transition-colors',
+                      isActive
+                        ? 'border-indigo-400/60 bg-indigo-500/15 text-indigo-100'
+                        : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'
+                    )}
+                  >
+                    <span className={cn('w-2 h-2 rounded-full', statusColor)} />
+                    <span className="max-w-[220px] truncate">{getDisplayDocumentName(doc.documentName)}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Messages Area */}
       <MessageList messages={messages || []} isLoading={isLoading} />
 
-      {/* Upload Toggle */}
+      {/* Upload Panel */}
       {showUpload && (
         <div className="px-4 pb-2">
+          <div className="flex justify-end mb-2">
+            <button
+              type="button"
+              onClick={() => setShowUpload(false)}
+              className="inline-flex items-center justify-center rounded-md border border-white/10 bg-white/5 p-1.5 text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+              aria-label="Close upload panel"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
           <DocumentUpload
             chatId={chatId || ''}
             queuedFile={queuedUploadFile}
@@ -353,9 +427,8 @@ export default function ChatPage() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => setShowUpload(!showUpload)}
+          onClick={() => setShowUpload(true)}
           leftIcon={<FileText className="w-4 h-4" />}
-          className={showUpload ? 'bg-white/10' : ''}
         >
           Upload
         </Button>

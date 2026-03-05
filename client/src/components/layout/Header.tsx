@@ -4,7 +4,6 @@ import {
   Menu, 
   X, 
   LogOut, 
-  Settings, 
   FileText
 } from 'lucide-react';
 import { useState } from 'react';
@@ -121,14 +120,6 @@ export function Header({ onMenuToggle, isMobileMenuOpen }: HeaderProps) {
                       My Documents
                     </Link>
                     
-                    <Link
-                      to="/settings"
-                      className="flex items-center gap-3 px-4 py-2 text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors"
-                      onClick={() => setIsDropdownOpen(false)}
-                    >
-                      <Settings className="w-4 h-4" />
-                      Settings
-                    </Link>
                   </div>
 
                   {/* Sign Out */}

@@ -1,7 +1,8 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuthStore } from '../../lib/store';
-import { useChats, useDocuments, useCreateChat } from '../../hooks';
+import { useChats, useDocuments } from '../../hooks';
 import { Button, Card, CardContent } from '../../components/ui';
+import { ChatNameDialog } from '../../components/chat/ChatNameDialog';
 import { 
   Plus, 
   MessageSquare, 
@@ -12,7 +13,7 @@ import {
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '../../lib/utils';
-import { toast } from 'sonner';
+import { useState } from 'react';
 
 /**
  * Dashboard Page
@@ -29,10 +30,9 @@ import { toast } from 'sonner';
 
 export default function Dashboard() {
   const { user } = useAuthStore();
-  const navigate = useNavigate();
   const { data: chats, isLoading: chatsLoading } = useChats();
   const { data: documents, isLoading: docsLoading } = useDocuments();
-  const createChatMutation = useCreateChat();
+  const [isChatDialogOpen, setIsChatDialogOpen] = useState(false);
 
   // Get time-based greeting
   const getGreeting = () => {
@@ -95,17 +95,7 @@ export default function Dashboard() {
           <Button 
             variant="primary" 
             leftIcon={<Plus className="w-4 h-4" />}
-            onClick={async () => {
-              try {
-                const newChat = await createChatMutation.mutateAsync({
-                  title: 'New Chat',
-                });
-                navigate(`/chat/${newChat.id}`);
-              } catch (error) {
-                toast.error('Failed to create chat');
-              }
-            }}
-            isLoading={createChatMutation.isPending}
+            onClick={() => setIsChatDialogOpen(true)}
           >
             New Chat
           </Button>
@@ -183,17 +173,7 @@ export default function Dashboard() {
                   variant="ghost"
                   size="sm"
                   className="mt-2"
-                  onClick={async () => {
-                    try {
-                      const newChat = await createChatMutation.mutateAsync({
-                        title: 'New Chat',
-                      });
-                      navigate(`/chat/${newChat.id}`);
-                    } catch (error) {
-                      toast.error('Failed to create chat');
-                    }
-                  }}
-                  isLoading={createChatMutation.isPending}
+                  onClick={() => setIsChatDialogOpen(true)}
                 >
                   Start your first chat
                 </Button>
@@ -350,6 +330,11 @@ export default function Dashboard() {
           </div>
         </div>
       </Card>
+
+      <ChatNameDialog
+        open={isChatDialogOpen}
+        onOpenChange={setIsChatDialogOpen}
+      />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import {
   useDocuments,
   useDeleteDocument,
   useCreateChat,
+  useChats,
   useAvailableChatsForDocument,
   useLinkDocumentToChat,
   useCreateChatWithDocument,
@@ -40,6 +41,7 @@ import { getDisplayDocumentName } from '../../lib/utils';
 export default function DocumentsPage() {
   const navigate = useNavigate();
   const { data: documents, isLoading } = useDocuments();
+  const { data: allChats = [], isLoading: allChatsLoading } = useChats();
   const deleteDocumentMutation = useDeleteDocument();
   const createChatMutation = useCreateChat();
   const linkDocumentToChatMutation = useLinkDocumentToChat();
@@ -68,6 +70,11 @@ export default function DocumentsPage() {
   } = useAvailableChatsForDocument(selectedDocumentId || '', {
     enabled: useInChatOpen && !!selectedDocumentId,
   });
+
+  const availableChatIds = new Set(availableChats.map((chat) => chat.id));
+  const linkedChats = selectedDocumentId
+    ? allChats.filter((chat) => !availableChatIds.has(chat.id))
+    : [];
 
   // Handle document selection (create chat with document)
   const handleSelectDocument = async (docId: string) => {
@@ -265,33 +272,66 @@ export default function DocumentsPage() {
           <DialogHeader>
             <DialogTitle>Use In Chat</DialogTitle>
             <DialogDescription>
-              Choose a chat to link <span className="text-white">{selectedDocumentName}</span>.
-              Already-linked chats are hidden.
+              Manage where <span className="text-white">{selectedDocumentName}</span> is used.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
-            {availableChatsLoading ? (
+          <div className="space-y-4 max-h-80 overflow-y-auto pr-1">
+            {availableChatsLoading || allChatsLoading ? (
               <div className="flex items-center justify-center py-6">
                 <Loader2 className="w-5 h-5 animate-spin text-indigo-400" />
                 <span className="ml-2 text-sm text-white/60">Loading chats...</span>
               </div>
-            ) : availableChats.length === 0 ? (
-              <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-white/60">
-                No available chats found. Create a new chat to continue.
-              </div>
             ) : (
-              availableChats.map((chat) => (
-                <button
-                  key={chat.id}
-                  onClick={() => handleLinkToExistingChat(chat.id)}
-                  className="w-full text-left rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 px-3 py-2.5 transition-colors"
-                  disabled={linkDocumentToChatMutation.isPending || createChatWithDocumentMutation.isPending}
-                >
-                  <p className="text-sm font-medium text-white">{chat.title}</p>
-                  <p className="text-xs text-white/50 mt-1">Open this chat with document linked</p>
-                </button>
-              ))
+              <>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-white/40 mb-2">
+                    Already linked
+                  </p>
+                  {linkedChats.length === 0 ? (
+                    <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-white/60">
+                      This document is not linked to any chat yet.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {linkedChats.map((chat) => (
+                        <div
+                          key={chat.id}
+                          className="w-full rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2.5"
+                        >
+                          <p className="text-sm font-medium text-white">{chat.title}</p>
+                          <p className="text-xs text-emerald-200/80 mt-1">Linked</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-white/40 mb-2">
+                    Available to link
+                  </p>
+                  {availableChats.length === 0 ? (
+                    <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-white/60">
+                      No additional chats available. Create a new chat to continue.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {availableChats.map((chat) => (
+                        <button
+                          key={chat.id}
+                          onClick={() => handleLinkToExistingChat(chat.id)}
+                          className="w-full text-left rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 px-3 py-2.5 transition-colors"
+                          disabled={linkDocumentToChatMutation.isPending || createChatWithDocumentMutation.isPending}
+                        >
+                          <p className="text-sm font-medium text-white">{chat.title}</p>
+                          <p className="text-xs text-white/50 mt-1">Link document to this chat</p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
             )}
           </div>
 
