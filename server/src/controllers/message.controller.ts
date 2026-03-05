@@ -70,41 +70,6 @@ export const query = asyncHandler(async (req: Request, res: Response, next: Next
 
     if (!query) throw new ApiError(404, 'did not find user query')
 
-    const documentDB = await prisma.document.findUnique({
-        where: { id: documentId },
-        select: {
-            id: true,
-            userId: true,
-            documentStatus: true,
-        }
-    })
-
-    if (!documentDB) {
-        throw new ApiError(404, "Document not found")
-    }
-
-    if (documentDB.userId !== user.id) {
-        throw new ApiError(403, "Unauthorized document access")
-    }
-
-    if (documentDB.documentStatus !== "ready") {
-        throw new ApiError(
-            409,
-            "Document is not ready for querying. If this is a scanned/image-only PDF, OCR is not supported yet."
-        )
-    }
-
-    const relation = await prisma.chatDocument.findUnique({
-        where: {
-            chatId_documentId: {
-                chatId,
-                documentId
-            }
-        }
-    });
-
-    if (!relation) throw new ApiError(403, "Document not linked to chat");
-
     const chatDB = await prisma.chat.findUnique({
         where: {
             id: chatId
@@ -113,6 +78,75 @@ export const query = asyncHandler(async (req: Request, res: Response, next: Next
 
     if (chatDB?.userId !== user.id) {
         throw new ApiError(403, "chat user id did not match, un authenticated user")
+    }
+
+    let targetDocumentIds: string[] = [];
+    if (documentId === "all") {
+        const chatDocuments = await prisma.chatDocument.findMany({
+            where: { chatId },
+            include: {
+                document: {
+                    select: {
+                        id: true,
+                        userId: true,
+                        documentStatus: true,
+                    },
+                },
+            },
+        });
+
+        if (!chatDocuments.length) {
+            throw new ApiError(404, "No documents linked to this chat");
+        }
+
+        const readyOwnedDocs = chatDocuments
+            .map((entry) => entry.document)
+            .filter((doc) => doc.userId === user.id && doc.documentStatus === "ready");
+
+        if (!readyOwnedDocs.length) {
+            throw new ApiError(
+                409,
+                "No ready documents found in this chat. Wait for ingestion to complete before querying."
+            );
+        }
+
+        targetDocumentIds = readyOwnedDocs.map((doc) => doc.id);
+    } else {
+        const documentDB = await prisma.document.findUnique({
+            where: { id: documentId },
+            select: {
+                id: true,
+                userId: true,
+                documentStatus: true,
+            }
+        })
+
+        if (!documentDB) {
+            throw new ApiError(404, "Document not found")
+        }
+
+        if (documentDB.userId !== user.id) {
+            throw new ApiError(403, "Unauthorized document access")
+        }
+
+        if (documentDB.documentStatus !== "ready") {
+            throw new ApiError(
+                409,
+                "Document is not ready for querying. If this is a scanned/image-only PDF, OCR is not supported yet."
+            )
+        }
+
+        const relation = await prisma.chatDocument.findUnique({
+            where: {
+                chatId_documentId: {
+                    chatId,
+                    documentId
+                }
+            }
+        });
+
+        if (!relation) throw new ApiError(403, "Document not linked to chat");
+        targetDocumentIds = [documentId];
     }
 
     // 1) store query in database along with chatId and role as user
@@ -152,8 +186,29 @@ export const query = asyncHandler(async (req: Request, res: Response, next: Next
     let userId = user.id
     let embeddings = queryEmbeddings[0]
 
-    // 3) send embedded query to retrieval function
-    const retrievalResponse: RetrievalResponse = await queryRetrieval({ embeddings, userId, documentId })
+    // 3) retrieve context from one or more linked ready documents
+    const retrievalResponses = await Promise.all(
+        targetDocumentIds.map((docId) => queryRetrieval({ embeddings, userId, documentId: docId }))
+    );
+
+    const aggregatedChunks = Array.from(
+        new Set(
+            retrievalResponses
+                .flatMap((response) => response.chunks)
+                .filter((chunk) => chunk && chunk.trim().length > 0)
+        )
+    );
+
+    const aggregatedContext = aggregatedChunks
+        .slice(0, 12)
+        .map((chunk, index) => `Chunk ${index + 1}:\n${chunk}`)
+        .join("\n\n---\n\n");
+
+    const retrievalResponse: RetrievalResponse = {
+        context: aggregatedContext,
+        chunks: aggregatedChunks,
+        found: aggregatedChunks.length > 0,
+    };
 
     console.log(`☑️ retrieved context for user query \n`)
 

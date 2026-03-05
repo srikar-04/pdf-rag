@@ -1,6 +1,6 @@
 import { Router } from "express";
 import authMiddleware from "../middlewares/auth.middleware.js";
-import { createChat, getAllChats, getChatById, getChatMessages, deleteChat } from "../controllers/chat.controller.js";
+import { createChat, getAllChats, getChatById, getChatMessages, updateChat, deleteChat } from "../controllers/chat.controller.js";
 
 const router = Router()
 
@@ -26,6 +26,12 @@ router.route('/:chatId').get(
 router.route('/:chatId').delete(
     authMiddleware,
     deleteChat
+)
+
+// Update chat title
+router.route('/:chatId').patch(
+    authMiddleware,
+    updateChat
 )
 
 // Get messages for a chat (Priority: P1)

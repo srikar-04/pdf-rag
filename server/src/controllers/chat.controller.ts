@@ -188,6 +188,55 @@ const createChat = asyncHandler( async (req: Request, res: Response, next:NextFu
 
 })
 
+/**
+ * Update Chat Name
+ * Priority: P2 - Important
+ */
+const updateChat = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    const userId = req.user?.id;
+    const { chatId } = req.params;
+    const { chatName } = req.body;
+
+    if (!userId) {
+        throw new ApiError(401, "Unauthorized, userId not found");
+    }
+
+    if (!chatId || Array.isArray(chatId)) {
+        throw new ApiError(400, "Valid Chat ID is required");
+    }
+
+    const parsedChatName = ChatCreateSchema.safeParse({
+        title: chatName,
+    });
+
+    if (!parsedChatName.success) {
+        const errorMessages = parsedChatName.error.issues.map((issue) => issue.message);
+        throw new ApiError(400, "chat name validation failed", errorMessages);
+    }
+
+    const chat = await prisma.chat.findFirst({
+        where: {
+            id: chatId,
+            userId,
+        },
+    });
+
+    if (!chat) {
+        throw new ApiError(404, "Chat not found or unauthorized");
+    }
+
+    const updatedChat = await prisma.chat.update({
+        where: {
+            id: chatId,
+        },
+        data: {
+            title: parsedChatName.data.title,
+        },
+    });
+
+    res.json(new ApiResponse(200, updatedChat, "Chat updated successfully"));
+});
+
 
 /**
  * Delete Chat
@@ -241,4 +290,4 @@ const deleteChat = asyncHandler(async (req: Request, res: Response, next: NextFu
 })
 
 
-export { createChat, getAllChats, getChatById, getChatMessages, deleteChat }
+export { createChat, getAllChats, getChatById, getChatMessages, updateChat, deleteChat }
