@@ -5,6 +5,7 @@ This project is configured for:
 - `client` (React + Vite) on **Vercel**
 - `server` (Express + Prisma + Auth.js) on **Render**
 - embeddings on **Cloudflare Workers AI**
+- embedding integration uses Cloudflare native `ai/run` endpoint (not OpenAI-compatible embeddings endpoint)
 
 ---
 
