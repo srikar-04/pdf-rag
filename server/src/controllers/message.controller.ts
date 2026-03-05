@@ -12,9 +12,11 @@ import { generateEmbeddings } from "../lib/cloudflareEmbeddings.js";
 
 // type MessagesType = ChatCompletionMessageParam[] extends {role: Role, content: any}
 const LLM_MODEL = "models/gemini-2.5-flash";
-const LLM_MAX_OUTPUT_TOKENS = 1600;
-const MAX_CONTINUATION_ATTEMPTS = 2;
+const LLM_MAX_OUTPUT_TOKENS = 1000;
+const MAX_CONTINUATION_ATTEMPTS = 1;
 const MAX_CONTEXT_CHARS = 18000;
+const LLM_RETRY_MAX_ATTEMPTS = 3;
+const LLM_RETRY_BASE_DELAY_MS = 1200;
 
 const CONTINUATION_PROMPT =
     "Continue exactly from where you stopped. Do not repeat earlier sections. Keep the same structure and complete the remaining explanation.";
@@ -53,6 +55,65 @@ const callAssistant = async (messages: ChatCompletionMessageParam[]) => {
         finishReason: choice?.finish_reason,
         usage: response.usage,
     };
+};
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const getLlmErrorStatus = (error: any): number | undefined => {
+    const raw = error?.status ?? error?.response?.status;
+    if (typeof raw !== "number") return undefined;
+    return raw;
+};
+
+const isRetryableLlmStatus = (status?: number): boolean =>
+    status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
+
+const mapLlmErrorToApiError = (error: any, fallbackMessage: string): ApiError => {
+    const status = getLlmErrorStatus(error);
+
+    if (status === 429) {
+        return new ApiError(
+            429,
+            "LLM provider is rate-limited right now. Please retry in a few seconds."
+        );
+    }
+
+    if (status === 504) {
+        return new ApiError(
+            504,
+            "LLM request timed out. Please retry with a shorter query."
+        );
+    }
+
+    if (status && status >= 500) {
+        return new ApiError(502, "LLM service is temporarily unavailable. Please retry shortly.");
+    }
+
+    return new ApiError(502, fallbackMessage);
+};
+
+const callAssistantWithRetry = async (messages: ChatCompletionMessageParam[]) => {
+    let lastError: unknown;
+
+    for (let attempt = 1; attempt <= LLM_RETRY_MAX_ATTEMPTS; attempt += 1) {
+        try {
+            return await callAssistant(messages);
+        } catch (error) {
+            lastError = error;
+            const status = getLlmErrorStatus(error);
+            const shouldRetry = isRetryableLlmStatus(status) && attempt < LLM_RETRY_MAX_ATTEMPTS;
+
+            if (!shouldRetry) {
+                throw error;
+            }
+
+            const backoffMs = LLM_RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1);
+            console.warn(`[LLM] transient error status=${status ?? "unknown"} retrying in ${backoffMs}ms (attempt ${attempt}/${LLM_RETRY_MAX_ATTEMPTS})`);
+            await sleep(backoffMs);
+        }
+    }
+
+    throw lastError;
 };
 
 export const query = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
@@ -287,10 +348,10 @@ export const query = asyncHandler(async (req: Request, res: Response, next: Next
 
     let firstResult: Awaited<ReturnType<typeof callAssistant>>;
     try {
-        firstResult = await callAssistant(messages);
+        firstResult = await callAssistantWithRetry(messages);
     } catch (error) {
         console.error("[LLM] initial generation failed:", error);
-        throw new ApiError(502, "LLM generation failed. Please retry your question.");
+        throw mapLlmErrorToApiError(error, "LLM generation failed. Please retry your question.");
     }
 
     if (!firstResult.choice) throw new ApiError(400, 'failed to get llm response')
@@ -312,7 +373,16 @@ export const query = asyncHandler(async (req: Request, res: Response, next: Next
             { role: "user", content: CONTINUATION_PROMPT }
         ];
 
-        const continuationResult = await callAssistant(continuationMessages);
+        let continuationResult: Awaited<ReturnType<typeof callAssistant>>;
+        try {
+            continuationResult = await callAssistantWithRetry(continuationMessages);
+        } catch (error) {
+            console.error(`[LLM] continuation attempt ${continuationAttempt} failed:`, error);
+            throw mapLlmErrorToApiError(
+                error,
+                "LLM continuation failed. Please retry your question."
+            );
+        }
         const nextChunk = continuationResult.content;
         if (!nextChunk) {
             console.warn(`[LLM] continuation attempt ${continuationAttempt} returned empty content`);
