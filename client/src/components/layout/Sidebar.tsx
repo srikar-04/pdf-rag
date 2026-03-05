@@ -225,7 +225,7 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
           <div className="p-3 border-t border-white/5">
             <div className="flex items-center gap-2 px-3 py-2 text-xs text-white/40">
               <Bot className="w-3.5 h-3.5" />
-              <span>Powered by Gemini & Ollama</span>
+              <span>Powered by Gemini & Cloudflare</span>
             </div>
           </div>
         </div>
