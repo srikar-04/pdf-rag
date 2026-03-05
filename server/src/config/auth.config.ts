@@ -10,6 +10,10 @@ const googleClientSecret = process.env.AUTH_GOOGLE_SECRET
 
 const authSecret = process.env.AUTH_SECRET
 const isProduction = process.env.NODE_ENV === 'production'
+const frontendUrl = process.env.FRONTEND_URL?.replace(/\/$/, '')
+const redirectProxyUrl =
+    process.env.AUTH_REDIRECT_PROXY_URL?.replace(/\/$/, '') ||
+    (frontendUrl ? `${frontendUrl}/auth` : undefined)
 
 if (!githubClientId || !githubClientSecret) {
     throw new Error('AUTH_GITHUB_ID or AUTH_GITHUB_SECRET is not defined')
@@ -31,6 +35,7 @@ export const authConfig: ExpressAuthConfig = {
     secret: authSecret,
     trustHost: true,
     basePath: '/auth',
+    ...(redirectProxyUrl ? { redirectProxyUrl } : {}),
     ...(isProduction
         ? {
             cookies: {
