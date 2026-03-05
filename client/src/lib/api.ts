@@ -220,7 +220,7 @@ export const apiEndpoints = {
       formData.append('file', file);
       return api.post(`/document/upload/${chatId}`, formData, {
         // Let the browser set multipart boundary automatically.
-        timeout: 120000,
+        timeout: 240000,
       });
     },
     status: (documentId: string) => api.get(`/document/status/${documentId}`),

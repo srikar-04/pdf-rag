@@ -87,7 +87,7 @@ const isOcrUnsupportedMessage = (message?: string): boolean =>
 
 const OCR_NOT_SUPPORTED_MESSAGE =
   'No extractable text was found. This looks like a scanned/image-only PDF. OCR is not supported yet, so please upload a text-based PDF.';
-const MAX_UPLOAD_SIZE_BYTES = 15 * 1024 * 1024;
+const MAX_UPLOAD_SIZE_BYTES = 30 * 1024 * 1024;
 
 export function DocumentUpload({
   chatId,
@@ -396,9 +396,9 @@ export function DocumentUpload({
       return;
     }
 
-    // Validate file size (15MB max)
+    // Validate file size (30MB max)
     if (file.size > MAX_UPLOAD_SIZE_BYTES) {
-      toast.error('File size must be less than 15MB');
+      toast.error('File size must be less than 30MB');
       return;
     }
 
