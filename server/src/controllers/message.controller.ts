@@ -14,6 +14,7 @@ import { generateEmbeddings } from "../lib/cloudflareEmbeddings.js";
 const LLM_MODEL = "models/gemini-2.5-flash";
 const LLM_MAX_OUTPUT_TOKENS = 1600;
 const MAX_CONTINUATION_ATTEMPTS = 2;
+const MAX_CONTEXT_CHARS = 18000;
 
 const CONTINUATION_PROMPT =
     "Continue exactly from where you stopped. Do not repeat earlier sections. Keep the same structure and complete the remaining explanation.";
@@ -187,9 +188,25 @@ export const query = asyncHandler(async (req: Request, res: Response, next: Next
     let embeddings = queryEmbeddings[0]
 
     // 3) retrieve context from one or more linked ready documents
-    const retrievalResponses = await Promise.all(
+    const retrievalResults = await Promise.allSettled(
         targetDocumentIds.map((docId) => queryRetrieval({ embeddings, userId, documentId: docId }))
     );
+
+    const retrievalResponses = retrievalResults
+        .filter((result): result is PromiseFulfilledResult<RetrievalResponse> => result.status === "fulfilled")
+        .map((result) => result.value);
+
+    const failedRetrievalCount = retrievalResults.length - retrievalResponses.length;
+    if (failedRetrievalCount > 0) {
+        console.warn(`[Retrieval] ${failedRetrievalCount}/${retrievalResults.length} retrieval calls failed`);
+    }
+
+    if (!retrievalResponses.length) {
+        throw new ApiError(
+            502,
+            "Failed to retrieve context from linked documents. Please try again in a moment."
+        );
+    }
 
     const aggregatedChunks = Array.from(
         new Set(
@@ -199,15 +216,23 @@ export const query = asyncHandler(async (req: Request, res: Response, next: Next
         )
     );
 
-    const aggregatedContext = aggregatedChunks
-        .slice(0, 12)
+    const boundedChunks: string[] = [];
+    let contextChars = 0;
+    for (const chunk of aggregatedChunks.slice(0, 20)) {
+        const nextLen = chunk.length;
+        if (contextChars + nextLen > MAX_CONTEXT_CHARS) break;
+        boundedChunks.push(chunk);
+        contextChars += nextLen;
+    }
+
+    const aggregatedContext = boundedChunks
         .map((chunk, index) => `Chunk ${index + 1}:\n${chunk}`)
         .join("\n\n---\n\n");
 
     const retrievalResponse: RetrievalResponse = {
         context: aggregatedContext,
-        chunks: aggregatedChunks,
-        found: aggregatedChunks.length > 0,
+        chunks: boundedChunks,
+        found: boundedChunks.length > 0,
     };
 
     console.log(`☑️ retrieved context for user query \n`)
@@ -260,7 +285,13 @@ export const query = asyncHandler(async (req: Request, res: Response, next: Next
         }
     ]
 
-    const firstResult = await callAssistant(messages);
+    let firstResult: Awaited<ReturnType<typeof callAssistant>>;
+    try {
+        firstResult = await callAssistant(messages);
+    } catch (error) {
+        console.error("[LLM] initial generation failed:", error);
+        throw new ApiError(502, "LLM generation failed. Please retry your question.");
+    }
 
     if (!firstResult.choice) throw new ApiError(400, 'failed to get llm response')
 
