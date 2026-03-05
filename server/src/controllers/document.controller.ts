@@ -78,7 +78,7 @@ export const documentUpload = asyncHandler(async (req: Request, res: Response, n
     // create entry in db
     // return response
 
-    const imageKitResponse: ImageKit.FileUploadResponse | Document = await uploadToImagekit(file, fileHash)
+    const imageKitResponse: ImageKit.FileUploadResponse | Document = await uploadToImagekit(file, fileHash, userId)
 
     console.log('\n \n Imagekit response / document response : ', imageKitResponse, '\n \n ')
 
@@ -88,6 +88,10 @@ export const documentUpload = asyncHandler(async (req: Request, res: Response, n
         deleteLocalFile(file)
     } else {
         console.log('response is the already existed document: ', imageKitResponse)
+
+        if ((imageKitResponse as Document).userId !== userId) {
+            throw new ApiError(403, 'Unauthorized existing document ownership mismatch')
+        }
 
         // check if there is already a relation between the same chatId and same document
 
@@ -272,7 +276,7 @@ export const documentStatus = asyncHandler(async (req: Request, res: Response, n
     }
 
     if(user.id !== docDB.userId) {
-        throw new ApiError(404, 'user id does not match in doc status handler')
+        throw new ApiError(403, 'user id does not match in doc status handler')
     }
 
     const failureReason = getFailureReason(docDB.documentStatus, docDB.ingestionStep);

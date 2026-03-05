@@ -83,8 +83,10 @@ model Document {
   documentStatus DocStatus
   ingestionStep  IngestionStep  @default(none)
   chunks         ChunkHash[]
-  documentHash   String         @unique
+  documentHash   String
   documentMetadata DocumentMetadata?
+
+  @@unique([userId, documentHash])
 }
 
 model DocumentMetadata {

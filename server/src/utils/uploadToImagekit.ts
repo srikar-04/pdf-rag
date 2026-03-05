@@ -12,7 +12,7 @@ export const deleteLocalFile = (file: Express.Multer.File) => {
     })
 }
 
-export const uploadToImagekit = async (file: Express.Multer.File, fileHash: string) => {
+export const uploadToImagekit = async (file: Express.Multer.File, fileHash: string, userId: string) => {
 
     const imageKitPrivateKey = process.env.IMAGEKIT_PRIVATE_KEY
 
@@ -32,8 +32,9 @@ export const uploadToImagekit = async (file: Express.Multer.File, fileHash: stri
     }
 
     // check if the file is already present in database
-    const fileExists = await prisma.document.findUnique({
+    const fileExists = await prisma.document.findFirst({
         where: {
+            userId: userId,
             documentHash: fileHash
         }
     })
