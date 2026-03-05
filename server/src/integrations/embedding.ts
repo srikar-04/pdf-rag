@@ -31,6 +31,28 @@ const BATCH_SIZE = 10;
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
 
+const getEmbeddingErrorDetails = (error: unknown): string => {
+  const err = error as any;
+  const status = err?.status ?? err?.response?.status;
+  const code = err?.code ?? err?.error?.code;
+  const type = err?.type ?? err?.error?.type;
+  const message = err?.message || 'Unknown embedding error';
+  const providerErrorMessage =
+    err?.error?.message ||
+    err?.response?.data?.errors?.[0]?.message ||
+    err?.response?.data?.error;
+
+  const details = [
+    status ? `status=${status}` : undefined,
+    code ? `code=${code}` : undefined,
+    type ? `type=${type}` : undefined,
+    message ? `message=${message}` : undefined,
+    providerErrorMessage ? `provider=${providerErrorMessage}` : undefined,
+  ].filter(Boolean);
+
+  return details.join(' | ');
+};
+
 /**
  * Sleep utility for retry delays
  */
@@ -65,7 +87,8 @@ const embedChunkWithRetry = async (
       };
       
     } catch (error) {
-      lastError = error as Error;
+      const detail = getEmbeddingErrorDetails(error);
+      lastError = new Error(detail);
       
       if (attempt < MAX_RETRIES) {
         // Exponential backoff: 1s, 2s, 4s
@@ -146,6 +169,14 @@ export const embedding = async (
     
     const successfulInBatch = batchResults.filter(r => r !== null).length;
     console.log(`[Embedding] Batch ${batchNum + 1} complete: ${successfulInBatch}/${batch.length} successful`);
+    if (successfulInBatch === 0) {
+      const firstFailedInBatch = failedChunks.find((entry) => entry.index >= batchStart && entry.index < batchEnd);
+      if (firstFailedInBatch) {
+        console.error(
+          `[Embedding] Batch ${batchNum + 1} failed sample (chunk ${firstFailedInBatch.index}): ${firstFailedInBatch.error}`
+        );
+      }
+    }
   }
   
   const duration = Date.now() - startTime;
