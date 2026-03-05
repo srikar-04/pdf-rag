@@ -22,8 +22,14 @@ export const validatePdfUpload = asyncHandler(async (req: Request, res: Response
 
     if (!parsedFileDetails.success) {
         const errorMessages = parsedFileDetails.error.issues.map(issue => issue.message)
+        const hasTooLargeViolation = parsedFileDetails.error.issues.some(issue => issue.code === 'too_big')
+        const hasInvalidTypeViolation = parsedFileDetails.error.issues.some(
+            issue => issue.path.includes('fileType')
+        )
+
+        const statusCode = hasTooLargeViolation ? 413 : hasInvalidTypeViolation ? 415 : 400
         deleteLocalFile(file)
-        throw new ApiError(413, 'File validation failed', errorMessages)
+        throw new ApiError(statusCode, 'File validation failed', errorMessages)
     }
 
     next()

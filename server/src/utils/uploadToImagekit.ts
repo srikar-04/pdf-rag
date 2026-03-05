@@ -3,7 +3,7 @@ import ApiError from "./apiError.js"
 import fs from 'fs'
 import { prisma } from "../lib/prisma.js"
 
-const IMAGEKIT_UPLOAD_TIMEOUT_MS = 90_000;
+const IMAGEKIT_UPLOAD_TIMEOUT_MS = 180_000;
 
 export const deleteLocalFile = (file: Express.Multer.File) => {
     fs.unlink(file.path, (err) => {

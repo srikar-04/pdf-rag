@@ -77,9 +77,11 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   console.error('Error caught by middleware:', err)
 
   if (err instanceof ApiError) {
-    return res.status(err.statusCode).json(
-      new ApiResponse(err.statusCode, {}, err.message)
-    )
+    const errorResponse = new ApiResponse(err.statusCode, {}, err.message)
+    return res.status(err.statusCode).json({
+      ...errorResponse,
+      errors: err.errors,
+    })
   }
 
   // Handle unexpected errors
